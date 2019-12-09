@@ -8,6 +8,7 @@ from collections import OrderedDict
 
 import dns.query
 import dns.message
+from dns.message import Message as DNSMessage
 
 from .error import DNSError, PluginExistsError
 
@@ -26,7 +27,7 @@ class DNSResolver(object):
         """挂载插件
 
         需要为插件指定一个唯一的名字，插件需为一个可调用对象，接受一个查询消息对象参数
-        如果插件返回一个字符串，则用该返回值作为解析结果
+        如果插件返回一个 DNSMessage 对象，则用该返回值作为解析结果
         如果插件返回 True，则表示执行成功，返回 False 则表示执行失败
         """
         if name in self.plugins:
@@ -36,15 +37,16 @@ class DNSResolver(object):
     def run_plugins(self, qmsg):
         """运行插件
 
-        如果有插件返回字符串，则用用该返回值作为解析结果返回，
-        如果有多个插件返回字符串，则以最后一个插件的返回值作为解析结果返回
-        如果没有插件返回字符串，且有插件执行成功，则返回 True，没有插件成功则返回 False
+        如果有插件返回 DNSMessage 对象，则用用该返回值作为解析结果返回，
+        如果有多个插件返回 DNSMessage 对象，则以最后一个插件的返回值作为解析结果返回
+        如果没有插件返回 DNSMessage 对象，且有插件执行成功，则返回 True
+        如果没有插件执行成功则返回 False
         """
         is_successful = False
         resp_msg = None
         for name, plugin in self.plugins.items():
             ret = plugin(qmsg)
-            if isinstance(ret, str):
+            if isinstance(ret, DNSMessage):
                 resp_msg = ret
             if ret is not False:
                 is_successful = True
@@ -61,11 +63,17 @@ class DNSResolver(object):
 
     def query(self, qmsg, protocol="udp"):
         ret = self.run_plugins(qmsg)
-        if isinstance(ret, str):
-            pass
+        if isinstance(ret, DNSMessage):
+            return ret
 
         for host, port in self.nameservers:
             try:
-                self._proxy_query(qmsg, host, port)
-            except Exception:
-                pass
+                amsg = self._proxy_query(qmsg, host, port)
+            except Exception as e:
+                log.error("proxy query error: %s", e)
+            else:
+                continue
+        else:
+            raise DNSError("dns query error, query message: %s" % qmsg)
+
+        return amsg
