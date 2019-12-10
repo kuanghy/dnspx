@@ -3,6 +3,6 @@
 # Copyright (c) Huoty, All rights reserved
 # Author: Huoty <sudohuoty@163.com>
 
-DNSError = type("DNSError", (object,), {})
+DNSError = type("DNSError", (Exception,), {})
 
-PluginExistsError = type("PluginExistsError", (object,), {})
+PluginExistsError = type("PluginExistsError", (Exception,), {})

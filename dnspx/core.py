@@ -9,7 +9,7 @@ import socketserver
 
 import dns.message
 
-from .resolve import
+from .resolve import DNSResolver
 
 
 log = logging.getLogger(__name__)
@@ -18,15 +18,27 @@ log = logging.getLogger(__name__)
 class DNSHandler():
 
     def parse(self, message):
-        response = ""
-
+        response = b''
+        client = self.client_address[0]
         try:
             qmsg = dns.message.from_wire(message)
+            question = qmsg.question[-1]
+            qmsg.qname = question.name
+            qmsg.qname_str = question.name.to_text().strip('.')
+            qmsg.qtype = question.rdtype
+            qmsg.qclass = question.rdclass
         except Exception:
-            log.error(f"{self.client_address[0]}: ERROR: invalid DNS request")
-            return response
+            log.error(f"{client} query error: invalid DNS request")
+            return
 
-        DNSResolver()
+        questions = "; ".join(str(q) for q in qmsg.question)
+        log.info(f"Query from {client}, question: {questions}")
+        try:
+            amsg = self.server.dns_resolver.query(qmsg)
+            response = amsg.to_wire()
+        except Exception as e:
+            log.error(f"DNS query error, query message: \n{qmsg}")
+            log.exception(e)
 
         return response
 
@@ -58,7 +70,7 @@ class TCPHandler(DNSHandler, socketserver.BaseRequestHandler):
             self.request.sendall(length + response)
 
 
-class SocketServer(socketserver.ThreadingMixIn):
+class BaseSocketServer(socketserver.ThreadingMixIn):
 
     def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, log):
         self.nametodns = nametodns
@@ -66,36 +78,28 @@ class SocketServer(socketserver.ThreadingMixIn):
         self.ipv6 = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
         self.log = log
+
+        self.dns_resolver = DNSResolver(nameservers)
 
         super().__init__(server_address, RequestHandlerClass)
 
 
-class ThreadedUDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
+class ThreadedUDPServer(BaseSocketServer, socketserver.UDPServer):
+
+    pass
+
+
+class ThreadedTCPServer(BaseSocketServer, socketserver.TCPServer):
 
     # Override default value
     allow_reuse_address = True
-
-    # Override SocketServer.TCPServer to add extra parameters
-    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, log):
-        self.nametodns = nametodns
-        self.nameservers = nameservers
-        self.ipv6 = ipv6
-        self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
-        self.log = log
-
-        socketserver.TCPServer.__init__(self, server_address, RequestHandlerClass)
-
-
-class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-
-    pass
 
 
 class DNSProxyServer(object):
 
     def run(object):
         nametodns = None
-        nameservers = ["119.29.29.29"]
+        nameservers = [("119.29.29.29", 53)]
         ipv6 = True
         server = ThreadedUDPServer(("127.0.0.1", 53), UDPHandler, nametodns, nameservers, ipv6, log)
         server.serve_forever()
