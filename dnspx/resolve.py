@@ -19,6 +19,8 @@ import dns.rdtypes.IN.A
 import dns.rdtypes.IN.AAAA
 from dns.message import Message as DNSMessage
 
+from cacheout import Cache
+
 from . import config
 from .utils import cached_property, thread_sync
 from .error import DNSError, PluginExistsError
@@ -73,7 +75,7 @@ class DNSResolver(object):
 
     @thread_sync()
     def _initialize_plugins(self):
-        log.info("initializing plugins")
+        log.info("Initializing plugins")
         plugins = OrderedDict()
         if config.ENABLE_LOCAL_HOSTS:
             plugins["hosts"] = LocalHostPlugin(self.hosts)
@@ -120,26 +122,61 @@ class DNSResolver(object):
                 is_successful = True
         return is_successful if resp_msg is None else resp_msg
 
+    @cached_property
+    def query_cache(self):
+        return Cache(
+            maxsize=config.DNS_CACHE_SIZE,
+            ttl=config.DNS_CACHE_TTL,
+        )
+
+    @staticmethod
+    def _get_cache_key(qname, qclass, qtype):
+        return f"{qname}_{qclass}_{qtype}"
+
+    def set_cache(self, name, qclass, qtype, amsg):
+        key = self._get_cache_key(name, qclass, qtype)
+        self.query_cache.set(key, amsg)
+
+    def get_cache(self, name, qclass, qtype):
+        key = self._get_cache_key(name, qclass, qtype)
+        return self.query_cache.get(key)
+
     def _proxy_query(self, qmsg, host, port=53):
         return proxy_dns_query(qmsg, host, port, self.timeout)
 
     def query(self, qmsg):
-        if qmsg.opcode() == dns.opcode.QUERY and qmsg.qtype in {
-            dns.rdatatype.A,  dns.rdatatype.AAAA
-        }:
-            ret = self.run_plugins(qmsg)
-            if isinstance(ret, DNSMessage):
-                return ret
+        name = qmsg.qname_str
+        qclass = qmsg.qclass
+        qtype = qmsg.qtype
+        question_str = qmsg.question_str
+        is_query_op = (qmsg.opcode() == dns.opcode.QUERY)
+        enable_dns_cache = config.ENABLE_DNS_CACHE
+        if is_query_op:
+            if enable_dns_cache:
+                data = self.get_cache(name, qclass, qtype)
+                if data:
+                    log.debug(f"Query '{question_str}' cache is valid, use it")
+                    data.id = qmsg.id
+                    return data
+            if qtype in {dns.rdatatype.A,  dns.rdatatype.AAAA}:
+                ret = self.run_plugins(qmsg)
+                if isinstance(ret, DNSMessage):
+                    if enable_dns_cache:
+                        self.set_cache(name, qclass, qtype, ret)
+                    return ret
 
         for host, port, *_ in self.nameservers:
             try:
                 amsg = self._proxy_query(qmsg, host, port)
             except Exception as e:
-                log.error("Proxy query error: %s", e)
+                log.error(f"Proxy dns '{host}' query error: {e}")
             else:
                 break
         else:
             raise DNSError("no servers could be reached")
+
+        if is_query_op and enable_dns_cache:
+            self.set_cache(name, qclass, qtype, amsg)
 
         return amsg
 
@@ -237,7 +274,7 @@ class LocalHostPlugin(object):
 
         rrset = dns.rrset.RRset(qmsg.qname, qmsg.qclass, qmsg.qtype)
         rrset.add(rd)
-        rrset.ttl = 86400
+        rrset.ttl = 86400  # a day
 
         amsg = dns.message.make_response(qmsg)
         amsg.answer.append(rrset)
@@ -302,7 +339,7 @@ class ForeignResolverPlugin(object):
             try:
                 amsg = proxy_dns_query(qmsg, host, port, self.timeout)
             except Exception as e:
-                log.error(f"Proxy query error: {e}, dns: {host}")
+                log.error(f"Proxy dns '{host}' query error: {e}")
             else:
                 return amsg
 

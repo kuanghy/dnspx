@@ -14,7 +14,7 @@ def main():
         return
     logging.basicConfig(
         stream=sys.stdout,
-        level=logging.INFO,
+        level=logging.DEBUG,
         format="%(asctime)s - %(levelname)s - %(message)s",
     )
     server = DNSProxyServer()

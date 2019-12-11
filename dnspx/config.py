@@ -31,6 +31,11 @@ NAMESERVERS = [
     "114.114.114.110",  # 114DNS 拦截色情网站
 ]
 
+# 开启 DNS 缓存
+ENABLE_DNS_CACHE = True
+DNS_CACHE_SIZE = 1024
+DNS_CACHE_TTL = 60 * 60 * 1
+
 # 开启本地 hosts 文件支持
 ENABLE_LOCAL_HOSTS = True
 LOCAL_HOSTS_PATH = None  # 可以为目录或者文件

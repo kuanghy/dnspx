@@ -25,6 +25,7 @@ class DNSHandler():
             question = qmsg.question[-1]
             qmsg.qname = question.name
             qmsg.qname_str = question.name.to_text().strip('.')
+            qmsg.question_str = "; ".join(str(q) for q in qmsg.question)
             qmsg.qtype = question.rdtype
             qmsg.qclass = question.rdclass
             qmsg.qprotocol = self.server.server_type
@@ -32,8 +33,7 @@ class DNSHandler():
             log.error(f"{client} query error: invalid DNS request")
             return
 
-        questions = "; ".join(str(q) for q in qmsg.question)
-        log.info(f"Query from {client}, question: {questions}")
+        log.info(f"Query from {client}, question: {qmsg.question_str}")
         try:
             amsg = self.server.dns_resolver.query(qmsg)
             response = amsg.to_wire()
