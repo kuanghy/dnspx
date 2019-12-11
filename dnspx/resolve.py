@@ -261,13 +261,13 @@ class LocalHostPlugin(object):
             rd = dns.rdtypes.IN.A.A(
                 dns.rdataclass.IN,
                 dns.rdatatype.A,
-                "127.0.0.1"
+                host,
             )
         elif qmsg.qtype == dns.rdatatype.AAAA and ip_addr.version == 6:
             rd = dns.rdtypes.IN.AAAA.AAAA(
                 dns.rdataclass.IN,
                 dns.rdatatype.AAAA,
-                "::1"
+                host,
             )
         else:
             return True
