@@ -27,6 +27,7 @@ class DNSHandler():
             qmsg.qname_str = question.name.to_text().strip('.')
             qmsg.qtype = question.rdtype
             qmsg.qclass = question.rdclass
+            qmsg.qprotocol = self.server.server_type
         except Exception:
             log.error(f"{client} query error: invalid DNS request")
             return
@@ -86,10 +87,12 @@ class BaseSocketServer(socketserver.ThreadingMixIn):
 
 class ThreadedUDPServer(BaseSocketServer, socketserver.UDPServer):
 
-    pass
+    server_type = "udp"
 
 
 class ThreadedTCPServer(BaseSocketServer, socketserver.TCPServer):
+
+    server_type = "tcp"
 
     # Override default value
     allow_reuse_address = True

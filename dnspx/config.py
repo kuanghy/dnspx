@@ -9,9 +9,43 @@ _log = __import__("logging").getLogger(__name__)
 
 USER_HOME = _os.getenv("HOME", "/home/server")
 
+# 配置公共 DNS 服务器
+# 每一个 DNS 配置可以为一个 tuple，list，每一项包含：IP地址，端口，类型，说明
+# 除 IP地址 外，其他项为非必须项，不指定时取默认值，端口为 53，属性 inland，说明为 None
+# DNS 配置也可以为一个仅包含 ip 的字符串
+NAMESERVERS = [
+    ("119.29.29.29", "53", "inland", "Public DNS+，腾讯云旗下的公共 DNS 服务"),
+    ("223.5.5.5", "53", "inland", "AliDNS 阿里公共 DNS"),
+    ("114.114.114.114", "53", "inland", "国内电信运营商自用的 DNS 服务"),
+    ("180.76.76.76", "53", "inland", "百度 BaiduDNS"),
+    ("1.2.4.8", "53", "inland", "CNNIC sDNS"),
+    ("117.50.11.11", "53", "inland", "OneDNS 拦截版"),
+    ("117.50.10.10", "53", "inland", "OneDNS 纯净版"),
+    ("1.1.1.1", "53", "foreign", "CloudFlare DNS，号称全球最快的 DNS 服务"),
+    ("8.8.8.8", "53", "foreign", "Google Public DNS"),
+    ("1.0.0.1", "53", "foreign", "CloudFlare DNS 备用地址"),
+    ("8.8.4.4", "53", "foreign", "Google Public DNS 备用地址"),
+    "223.6.6.6",  # Public DNS+ 备用地址
+    "114.114.115.115",  # 114DNS 备用地址
+    "114.114.114.119",  # 114DNS 拦截钓鱼病毒木马网站
+    "114.114.114.110",  # 114DNS 拦截色情网站
+]
+
 # 开启本地 hosts 文件支持
 ENABLE_LOCAL_HOSTS = True
-LOCAL_HOSTS_PATH = None
+LOCAL_HOSTS_PATH = None  # 可以为目录或者文件
+
+# 开启海外域名用海外 DNS 解析功能
+ENABLE_FOREIGN_RESOLVER = True
+FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
+    "google.com",
+    "github.com",
+    "github.io",
+    # "sina.com",  # 部分匹配，匹配 sina.com、sina.com.cn、www.sina.com 等
+    # "full:google.com",  # 完全匹配，仅匹配 google.com
+    # "domain:google.com",  # 子域名匹配，匹配 xxx.google.com, yyy.google.com 等
+    # "ext:/etc/dnspx/foreign-domains",  # 重外部文件中读取配置
+]
 
 # 开启邮件报告功能，以通过邮件报告运行错误或者运行结果
 ENABLE_MAIL_REPORT = False

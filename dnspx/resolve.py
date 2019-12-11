@@ -7,7 +7,7 @@ import os
 import glob
 import logging
 import ipaddress
-from collections import OrderedDict
+from collections import namedtuple, OrderedDict
 
 import dns.query
 import dns.message
@@ -20,28 +20,74 @@ import dns.rdtypes.IN.AAAA
 from dns.message import Message as DNSMessage
 
 from . import config
-from .utils import cached_property
+from .utils import cached_property, thread_sync
 from .error import DNSError, PluginExistsError
 
 
 log = logging.getLogger(__name__)
 
 
+def proxy_dns_query(qmsg, host, port=53, timeout=5):
+    if qmsg.qprotocol == "udp":
+        amsg = dns.query.udp(qmsg, host, port=port, timeout=timeout)
+    elif qmsg.qprotocol == "tcp":
+        amsg = dns.query.tcp(qmsg, host, port=port, timeout=timeout)
+    else:
+        raise DNSError(f"unsupported protocol '{qmsg.qprotocol}'")
+    return amsg
+
+
 class DNSResolver(object):
 
     def __init__(self, nameservers=None, hosts=None, timeout=5):
-        self.nameservers = nameservers
+        self._nameservers = nameservers or []
         self.hosts = hosts
         self.timeout = timeout
 
+    @thread_sync()
+    def _fetch_nameservers(self):
+        servers = []
+        NameServer = namedtuple("NameServer", ("ip", "port", "type", "comment"))
+        NameServer.__new__.__defaults__ = (None, 53, "inland", None)
+        for server in self._nameservers + (config.NAMESERVERS or []):
+            if not isinstance(server, (tuple, list)):
+                server = (server, 53)
+            server = NameServer(*server)
+            server = server._replace(port=int(server.port))
+            servers.append(server)
+        return servers
+
     @cached_property
-    def plugins(self):
+    def nameservers(self):
+        return self._fetch_nameservers()
+
+    @cached_property
+    def foreign_nameservers(self):
+        servers = []
+        all_nameservers = self.nameservers
+        with thread_sync():
+            for server in all_nameservers:
+                if server.type == "foreign":
+                    servers.append(server)
+        return servers
+
+    @thread_sync()
+    def _initialize_plugins(self):
         log.info("initializing plugins")
         plugins = OrderedDict()
         if config.ENABLE_LOCAL_HOSTS:
             plugins["hosts"] = LocalHostPlugin(self.hosts)
+        if config.ENABLE_FOREIGN_RESOLVER:
+            plugins["foreign_resolver"] = ForeignResolverPlugin(
+                self.foreign_nameservers, self.timeout
+            )
         return plugins
 
+    @cached_property
+    def plugins(self):
+        return self._initialize_plugins()
+
+    @thread_sync()
     def mount_plugin(self, name, plugin):
         """挂载插件
 
@@ -74,17 +120,10 @@ class DNSResolver(object):
                 is_successful = True
         return is_successful if resp_msg is None else resp_msg
 
-    def _proxy_query(self, qmsg, host, port=53, protocol="udp"):
-        if protocol == "udp":
-            amsg = dns.query.udp(qmsg, host, port=port, timeout=self.timeout)
-        elif protocol == "tcp":
-            amsg = dns.query.tcp(qmsg, host, port=port, timeout=self.timeout)
-        else:
-            raise DNSError(f"unsupported protocol '{protocol}'")
-        return amsg
+    def _proxy_query(self, qmsg, host, port=53):
+        return proxy_dns_query(qmsg, host, port, self.timeout)
 
-    def query(self, qmsg, protocol="udp"):
-
+    def query(self, qmsg):
         if qmsg.opcode() == dns.opcode.QUERY and qmsg.qtype in {
             dns.rdatatype.A,  dns.rdatatype.AAAA
         }:
@@ -92,7 +131,7 @@ class DNSResolver(object):
             if isinstance(ret, DNSMessage):
                 return ret
 
-        for host, port in self.nameservers:
+        for host, port, *_ in self.nameservers:
             try:
                 amsg = self._proxy_query(qmsg, host, port)
             except Exception as e:
@@ -169,8 +208,9 @@ class LocalHostPlugin(object):
 
     @cached_property
     def hosts(self):
-        host_map = self.get_hosts_from_config()
-        host_map.update(self._hosts)
+        with thread_sync():
+            host_map = self.get_hosts_from_config()
+            host_map.update(self._hosts)
         return host_map
 
     def __call__(self, qmsg):
@@ -202,3 +242,68 @@ class LocalHostPlugin(object):
         amsg = dns.message.make_response(qmsg)
         amsg.answer.append(rrset)
         return amsg
+
+
+class ForeignResolverPlugin(object):
+
+    def __init__(self, nameservers=None, timeout=5):
+        self.nameservers = nameservers or [
+            ("8.8.8.8", 53)
+            ("1.1.1.1", 53)
+        ]
+        self.timeout = timeout
+
+    @thread_sync()
+    def _fetch_foreign_domains(self):
+        patterns = set()
+        external_config_prefix = "ext:"
+        for pattern in config.FOREIGN_DOMAINS:
+            if pattern.startswith(external_config_prefix):
+                config_path = pattern.replace(external_config_prefix, "")
+                with open(config_path) as fp:
+                    for line in fp:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        patterns.add(line)
+            patterns.add(pattern)
+        return patterns
+
+    @cached_property
+    def foreign_domains(self):
+        return self._fetch_foreign_domains()
+
+    full_match_prefix = "full:"
+    domain_match_prefix = "domain:"
+
+    def __call__(self, qmsg):
+        name = qmsg.qname_str
+        is_foreign = False
+        for pattern in self.foreign_domains:
+            if pattern.startswith(self.full_match_prefix):
+                pattern = pattern.replace(self.full_match_prefix, "")
+                if name == pattern:
+                    is_foreign = True
+                    break
+            elif pattern.startswith(self.domain_match_prefix):
+                pattern = pattern.replace(self.domain_match_prefix, "")
+                if name.endswith(pattern):
+                    is_foreign = True
+                    break
+            else:
+                if pattern in name:
+                    is_foreign = True
+                    break
+
+        if not is_foreign:
+            return True
+
+        for host, port, *_ in self.nameservers:
+            try:
+                amsg = proxy_dns_query(qmsg, host, port, self.timeout)
+            except Exception as e:
+                log.error(f"Proxy query error: {e}, dns: {host}")
+            else:
+                return amsg
+
+        return True
