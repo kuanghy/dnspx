@@ -6,6 +6,7 @@
 import os
 import glob
 import logging
+import ipaddress
 from collections import OrderedDict
 
 import dns.query
@@ -28,16 +29,17 @@ log = logging.getLogger(__name__)
 
 class DNSResolver(object):
 
-    def __init__(self, nameservers=None, adhosts=None, timeout=5):
+    def __init__(self, nameservers=None, hosts=None, timeout=5):
         self.nameservers = nameservers
-        self.adhosts = adhosts
+        self.hosts = hosts
         self.timeout = timeout
 
     @cached_property
     def plugins(self):
+        log.info("initializing plugins")
         plugins = OrderedDict()
-        if config.ENABLE_ADBLOCK:
-            plugins["adblock"] = ADBlockPlugin(self.adhosts)
+        if config.ENABLE_LOCAL_HOSTS:
+            plugins["hosts"] = LocalHostPlugin(self.hosts)
         return plugins
 
     def mount_plugin(self, name, plugin):
@@ -103,50 +105,88 @@ class DNSResolver(object):
         return amsg
 
 
-class ADBlockPlugin(object):
+class LocalHostPlugin(object):
 
-    def __init__(self, adhosts=None):
-        self._adhosts = adhosts or set()
+    def __init__(self, hosts=None):
+        self._hosts = hosts or {}
 
-    def get_adhosts_from_config(self):
-        config_paths = []
-        for config_dir in config.ADHOSTS_PATH:
+        self._ipv4_local = "127.0.0.1"
+        self._ipv6_local = "::1"
+
+    def get_sys_hosts_path(self):
+        return "/etc/hosts"
+
+    def get_hosts_config_paths(self):
+        config_paths = [
+            self.get_sys_hosts_path()
+        ]
+
+        def fetch_config_file(directory):
+            for path in glob.iglob(os.path.join(sub_config_dir, "*")):
+                if not os.path.isfile(path):
+                    continue
+                config_paths.append(path)
+
+        for config_dir in config._CONFIG_DIRS:
             if not config_dir or os.path.exists(config_dir):
                 continue
-            config_paths.append(os.path.join(config_dir, "adhosts"))
-            sub_config_dir = os.path.join(config_dir, "adhosts.conf.d")
-            for path in glob.iglob(os.path.join(sub_config_dir, "*")):
-                config_paths.append(path)
-        config_paths.append(config.ADHOSTS_PATH)
-        hosts = set()
+            config_paths.append(os.path.join(config_dir, "hosts"))
+            sub_config_dir = os.path.join(config_dir, "hosts.conf.d")
+            fetch_config_file(sub_config_dir)
+
+        if config.LOCAL_HOSTS_PATH:
+            if os.path.isdir(config.LOCAL_HOSTS_PATH):
+                fetch_config_file(config.LOCAL_HOSTS_PATH)
+            else:
+                config_paths.append(config.LOCAL_HOSTS_PATH)
+
+        return config_paths
+
+    def parse_hosts_file(self, path):
+        hosts = {}
+        with open(path) as fp:
+            for line in fp:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                host_name = line.split()
+                if len(host_name) > 1:
+                    host, name = host_name[:2]
+                else:
+                    host, name = host_name[0], self._ipv4_local
+                hosts[name] = host
+        return hosts
+
+    def get_hosts_from_config(self):
+        config_paths = self.get_hosts_config_paths()
+        hosts = {}
         for config_path in config_paths:
             if not config_path or not os.path.exists(config_path):
                 continue
-            log.info(f"Load adhosts file '{config_path}'")
-            with open(config_path) as fp:
-                for line in fp:
-                    line = line.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    hosts.add(line)
+            log.info(f"Load hosts file '{config_path}'")
+            hosts.update(self.parse_hosts_file(config_path))
         return hosts
 
     @cached_property
-    def adhosts(self):
-        return self._adhosts | self.get_adhosts_from_config()
+    def hosts(self):
+        host_map = self.get_hosts_from_config()
+        host_map.update(self._hosts)
+        return host_map
 
     def __call__(self, qmsg):
         name = qmsg.qname_str
-        if name not in self.adhosts:
+        host = self.hosts.get(name)
+        if not host:
             return True
 
-        if qmsg.qtype == dns.rdatatype.A:
+        ip_addr = ipaddress.ip_address(host)
+        if qmsg.qtype == dns.rdatatype.A and ip_addr.version == 4:
             rd = dns.rdtypes.IN.A.A(
                 dns.rdataclass.IN,
                 dns.rdatatype.A,
                 "127.0.0.1"
             )
-        elif qmsg.qtype == dns.rdatatype.AAAA:
+        elif qmsg.qtype == dns.rdatatype.AAAA and ip_addr.version == 6:
             rd = dns.rdtypes.IN.AAAA.AAAA(
                 dns.rdataclass.IN,
                 dns.rdatatype.AAAA,
@@ -162,7 +202,3 @@ class ADBlockPlugin(object):
         amsg = dns.message.make_response(qmsg)
         amsg.answer.append(rrset)
         return amsg
-
-
-class LocalHostsPlugin(object):
-    pass

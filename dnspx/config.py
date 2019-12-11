@@ -9,9 +9,9 @@ _log = __import__("logging").getLogger(__name__)
 
 USER_HOME = _os.getenv("HOME", "/home/server")
 
-# 开启广告过滤
-ENABLE_ADBLOCK = True
-ADHOSTS_PATH = None
+# 开启本地 hosts 文件支持
+ENABLE_LOCAL_HOSTS = True
+LOCAL_HOSTS_PATH = None
 
 # 开启邮件报告功能，以通过邮件报告运行错误或者运行结果
 ENABLE_MAIL_REPORT = False
