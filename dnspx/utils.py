@@ -78,3 +78,7 @@ class thread_sync(object):
                 ret = func(*args, **kwargs)
             return ret
         return wrapper
+
+
+def text_shorten(text, width=60, placeholder="..."):
+    return text[:width] + (text[width:] and placeholder)

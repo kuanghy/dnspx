@@ -141,6 +141,7 @@ class DNSResolver(object):
     def _get_cache_key(qname, qclass, qtype):
         return f"{qname}_{qclass}_{qtype}"
 
+    @thread_sync()
     def set_cache(self, name, qclass, qtype, amsg):
         key = self._get_cache_key(name, qclass, qtype)
         self.query_cache.set(key, amsg)
@@ -347,7 +348,7 @@ class ForeignResolverPlugin(object):
         if not is_foreign:
             return True
 
-        log.debug(f"Domain '{name}' is foreign, using an foreign nameserver")
+        log.debug(f"Domain '{name}' is foreign, using foreign nameserver")
         for host, port, *_ in self.nameservers:
             try:
                 amsg = proxy_dns_query(qmsg, host, port, self.timeout)

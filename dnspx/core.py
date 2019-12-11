@@ -5,6 +5,7 @@
 
 import socket
 import logging
+import binascii
 import socketserver
 
 import dns.message
@@ -31,7 +32,7 @@ class DNSHandler():
             qmsg.qprotocol = self.server.server_type
         except Exception:
             log.error(f"{client} query error: invalid DNS request")
-            return
+            return response
 
         log.info(f"Query from {client}, question: {qmsg.question_str}")
         try:
@@ -59,30 +60,27 @@ class TCPHandler(DNSHandler, socketserver.BaseRequestHandler):
     def handle(self):
         data = self.request.recv(1024)
 
-        # Remove the addition "length" parameter used in the
-        # TCP DNS protocol
+        # 在 TCP DNS 协议中，前两个字节用于存储响应的长度
         data = data[2:]
         response = self.parse(data)
 
         if response:
-            # Calculate and add the additional "length" parameter
-            # used in TCP DNS protocol
+            # 计算响应的长度
             length = binascii.unhexlify("%04x" % len(response))
             self.request.sendall(length + response)
 
 
 class BaseSocketServer(socketserver.ThreadingMixIn):
 
-    def __init__(self, server_address, RequestHandlerClass, nametodns, nameservers, ipv6, log):
-        self.nametodns = nametodns
+    def __init__(self, server_address, RequestHandlerClass, nameservers=None,
+                 ipv6=False):
+        super().__init__(server_address, RequestHandlerClass)
+
         self.nameservers = nameservers
         self.ipv6 = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
         self.log = log
-
         self.dns_resolver = DNSResolver(nameservers)
-
-        super().__init__(server_address, RequestHandlerClass)
 
 
 class ThreadedUDPServer(BaseSocketServer, socketserver.UDPServer):
@@ -94,15 +92,25 @@ class ThreadedTCPServer(BaseSocketServer, socketserver.TCPServer):
 
     server_type = "tcp"
 
-    # Override default value
+    # 允许地址重用
     allow_reuse_address = True
 
 
 class DNSProxyServer(object):
 
-    def run(object):
-        nametodns = None
-        nameservers = [("119.29.29.29", 53)]
-        ipv6 = True
-        server = ThreadedUDPServer(("127.0.0.1", 53), UDPHandler, nametodns, nameservers, ipv6, log)
+    def __init__(self, server_address, nameservers=None, enbale_tcp=False, enable_ipv6=False):
+        self.server_address = server_address
+        self.nameservers = nameservers
+        self.enbale_tcp = enbale_tcp
+        self.enable_ipv6 = enable_ipv6
+
+    def run(self):
+        server = ThreadedUDPServer(
+            self.server_address,
+            UDPHandler,
+            self.nameservers,
+            self.enable_ipv6,
+        )
+        log.info("DNSPX server started on address '%s:%s'",
+                 *self.server_address)
         server.serve_forever()

@@ -69,7 +69,7 @@ ROTATE_LOG_BACKUPS = _os.getenv("ROTATE_LOG_BACKUPS")
 TIME_ROTATE_LOG_FILE = _os.getenv("TIME_ROTATE_LOG_FILE")
 TIME_ROTATE_LOG_FILE_SUFFIX = "%Y%m%d"
 
-LOG_FORMAT = "[%(asctime)s] [%(name)s] [%(levelname)s] [%(process)d] %(message)s"
+LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 SMTP_LOG_FORMAT = """\
 Logger Name:        %(name)s
 Message type:       %(levelname)s
