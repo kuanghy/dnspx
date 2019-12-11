@@ -73,15 +73,25 @@ class DNSResolver(object):
                     servers.append(server)
         return servers
 
+    @staticmethod
+    def _mount_plugin(target, name, plugin):
+        if name in target:
+            raise PluginExistsError("plugin '{}' exists".format(name))
+        target[name] = plugin
+        log.info(f"Mounted '{name}' plugin")
+
     @thread_sync()
     def _initialize_plugins(self):
         log.info("Initializing plugins")
         plugins = OrderedDict()
         if config.ENABLE_LOCAL_HOSTS:
-            plugins["hosts"] = LocalHostPlugin(self.hosts)
+            self._mount_plugin(
+                plugins, "local_hosts", LocalHostsPlugin(self.hosts)
+            )
         if config.ENABLE_FOREIGN_RESOLVER:
-            plugins["foreign_resolver"] = ForeignResolverPlugin(
-                self.foreign_nameservers, self.timeout
+            self._mount_plugin(
+                plugins, "foreign_resolver",
+                ForeignResolverPlugin(self.foreign_nameservers, self.timeout)
             )
         return plugins
 
@@ -97,9 +107,7 @@ class DNSResolver(object):
         如果插件返回一个 DNSMessage 对象，则用该返回值作为解析结果
         如果插件返回 True，则表示执行成功，返回 False 则表示执行失败
         """
-        if name in self.plugins:
-            raise PluginExistsError("plugin '{}' exists".format(name))
-        self.plugins[name] = plugin
+        self._mount_plugin(self.plugins, name, plugin)
 
     def unload_plugin(self, name):
         self.plugins.pop(name, None)
@@ -169,8 +177,9 @@ class DNSResolver(object):
             try:
                 amsg = self._proxy_query(qmsg, host, port)
             except Exception as e:
-                log.error(f"Proxy dns '{host}' query error: {e}")
+                log.error(f"Proxy dns '{host}:{port}' query error: {e}")
             else:
+                log.debug(f"Proxy query successful, used dns '{host}:{port}'")
                 break
         else:
             raise DNSError("no servers could be reached")
@@ -181,7 +190,7 @@ class DNSResolver(object):
         return amsg
 
 
-class LocalHostPlugin(object):
+class LocalHostsPlugin(object):
 
     def __init__(self, hosts=None):
         self._hosts = hosts or {}
@@ -256,6 +265,7 @@ class LocalHostPlugin(object):
         if not host:
             return True
 
+        log.debug(f"Domain '{name}' in local hosts, host is '{host}'")
         ip_addr = ipaddress.ip_address(host)
         if qmsg.qtype == dns.rdatatype.A and ip_addr.version == 4:
             rd = dns.rdtypes.IN.A.A(
@@ -270,6 +280,8 @@ class LocalHostPlugin(object):
                 host,
             )
         else:
+            log.warning(f"Unsupported qtype '{qmsg.qtype}', "
+                        f"and ip address version '{ip_addr.version}'")
             return True
 
         rrset = dns.rrset.RRset(qmsg.qname, qmsg.qclass, qmsg.qtype)
@@ -335,12 +347,14 @@ class ForeignResolverPlugin(object):
         if not is_foreign:
             return True
 
+        log.debug(f"Domain '{name}' is foreign, using an foreign nameserver")
         for host, port, *_ in self.nameservers:
             try:
                 amsg = proxy_dns_query(qmsg, host, port, self.timeout)
             except Exception as e:
-                log.error(f"Proxy dns '{host}' query error: {e}")
+                log.error(f"Proxy dns '{host}:{port}' query error: {e}")
             else:
+                log.debug(f"Proxy query successful, used dns '{host}:{port}'")
                 return amsg
 
         return True
