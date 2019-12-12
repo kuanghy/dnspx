@@ -141,7 +141,6 @@ class DNSResolver(object):
     def _get_cache_key(qname, qclass, qtype):
         return f"{qname}_{qclass}_{qtype}"
 
-    @thread_sync()
     def set_cache(self, name, qclass, qtype, amsg):
         key = self._get_cache_key(name, qclass, qtype)
         self.query_cache.set(key, amsg)

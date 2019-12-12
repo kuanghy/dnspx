@@ -7,6 +7,15 @@ _os = __import__("os")
 _sys = __import__("sys")
 _log = __import__("logging").getLogger(__name__)
 
+# 判断系统平台
+IS_WINDOWS = _sys.platform in ['win32', 'cygwin']
+IS_MACOSX = _sys.platform == 'darwin'
+IS_LINUX = _sys.platform.startswith('linux')
+
+IS_UNIX = (IS_LINUX or IS_LINUX)
+
+
+# 用户主目录
 USER_HOME = _os.getenv("HOME", "/home/server")
 
 # 配置公共 DNS 服务器
@@ -51,6 +60,12 @@ FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
     # "domain:google.com",  # 子域名匹配，匹配 xxx.google.com, yyy.google.com 等
     # "ext:/etc/dnspx/foreign-domains",  # 重外部文件中读取配置
 ]
+
+# 服务监听地址
+SERVER_LISTEN = "127.0.0.1:53"
+
+# 服务器运行的进程优先级，值为 20 到 19，仅 Unix 环境有效
+PROCESS_PRIORITY = 0
 
 # 开启邮件报告功能，以通过邮件报告运行错误或者运行结果
 ENABLE_MAIL_REPORT = False

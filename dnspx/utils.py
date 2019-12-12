@@ -6,6 +6,7 @@
 import functools
 import threading
 from collections import Counter
+from urllib.parse import urlparse
 
 try:
     import asyncio
@@ -82,3 +83,8 @@ class thread_sync(object):
 
 def text_shorten(text, width=60, placeholder="..."):
     return text[:width] + (text[width:] and placeholder)
+
+
+def parse_ip_port(netloc):
+    parsed = urlparse(f'//{netloc}')
+    return parsed.hostname, parsed.port
