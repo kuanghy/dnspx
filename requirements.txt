@@ -1,3 +1,3 @@
-pythondns
+dnspython
 PyYAML
 cacheout

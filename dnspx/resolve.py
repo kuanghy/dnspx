@@ -179,7 +179,7 @@ class DNSResolver(object):
             try:
                 amsg = self._proxy_query(qmsg, host, port)
             except Exception as e:
-                log.error(f"Proxy query error, question: @{host}:{port} {qid} "
+                log.exception(f"Proxy query error, question: @{host}:{port} {qid} "
                           f"{question_str}, msg: {e}")
             else:
                 log.debug(f"Proxy query successful, used dns '{host}:{port}'")
