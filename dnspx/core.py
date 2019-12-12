@@ -39,7 +39,8 @@ class DNSHandler():
             log.error(f"{client} query error: invalid DNS request")
             return response
 
-        log.info(f"Query from {client}, question: {qmsg.question_str}")
+        log.info(f"Query from {client}, question: {qmsg.id} "
+                 f"{qmsg.question_str}")
         try:
             amsg = self.server.dns_resolver.query(qmsg)
             response = amsg.to_wire()
@@ -84,7 +85,10 @@ class BaseSocketServer(socketserver.ThreadingMixIn):
         self.nameservers = nameservers
         self.ipv6 = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
-        self.dns_resolver = DNSResolver(nameservers)
+        self.dns_resolver = DNSResolver(
+            nameservers,
+            timeout=config.QUERY_TIMEOUT,
+        )
 
 
 class ThreadedUDPServer(BaseSocketServer, socketserver.UDPServer):

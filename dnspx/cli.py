@@ -29,6 +29,9 @@ def parse_arguments(args):
             help="Enable TCP server, default UDP only")
     add_arg(server_group, "--enable-ipv6", action="store_true",
             help="Enable IPv6 protocel")
+    add_arg(server_group, "--hosts-path",
+            help="Hosts configuration file paths, "
+                 "overwrite LOCAL_HOSTS_PATH configuration")
 
     general_group = parser.add_argument_group(title="general arguments")
     add_arg(general_group, "--config", help="Path to config file")
@@ -74,6 +77,8 @@ def main(args=None):
             nameservers.append((ip, port or 53))
     else:
         nameservers = None
+    if args.hosts_path:
+        config.LOCAL_HOSTS_PATH = args.hosts_path
     server = DNSProxyServer(
         server_address,
         nameservers=nameservers,

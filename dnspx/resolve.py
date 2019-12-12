@@ -18,6 +18,7 @@ import dns.rrset
 import dns.rdtypes.IN.A
 import dns.rdtypes.IN.AAAA
 from dns.message import Message as DNSMessage
+from dns.rdatatype import to_text as qtype2text
 
 from cacheout import Cache
 
@@ -29,7 +30,7 @@ from .error import DNSError, PluginExistsError
 log = logging.getLogger(__name__)
 
 
-def proxy_dns_query(qmsg, host, port=53, timeout=5):
+def proxy_dns_query(qmsg, host, port=53, timeout=3):
     if qmsg.qprotocol == "udp":
         amsg = dns.query.udp(qmsg, host, port=port, timeout=timeout)
     elif qmsg.qprotocol == "tcp":
@@ -41,7 +42,7 @@ def proxy_dns_query(qmsg, host, port=53, timeout=5):
 
 class DNSResolver(object):
 
-    def __init__(self, nameservers=None, hosts=None, timeout=5):
+    def __init__(self, nameservers=None, hosts=None, timeout=3):
         self._nameservers = nameservers or []
         self.hosts = hosts
         self.timeout = timeout
@@ -154,6 +155,7 @@ class DNSResolver(object):
 
     def query(self, qmsg):
         name = qmsg.qname_str
+        qid = qmsg.id
         qclass = qmsg.qclass
         qtype = qmsg.qtype
         question_str = qmsg.question_str
@@ -177,7 +179,8 @@ class DNSResolver(object):
             try:
                 amsg = self._proxy_query(qmsg, host, port)
             except Exception as e:
-                log.error(f"Proxy dns '{host}:{port}' query error: {e}")
+                log.error(f"Proxy query error, question: @{host}:{port} {qid} "
+                          f"{question_str}, msg: {e}")
             else:
                 log.debug(f"Proxy query successful, used dns '{host}:{port}'")
                 break
@@ -238,8 +241,10 @@ class LocalHostsPlugin(object):
                 if len(host_name) > 1:
                     host, name = host_name[:2]
                 else:
-                    host, name = host_name[0], self._ipv4_local
+                    host, name = self._ipv4_local, host_name[0]
                 hosts[name] = host
+        if hosts:
+            log.info(f"Load hosts file '{path}', size {len(hosts)}")
         return hosts
 
     def get_hosts_from_config(self):
@@ -248,7 +253,6 @@ class LocalHostsPlugin(object):
         for config_path in config_paths:
             if not config_path or not os.path.exists(config_path):
                 continue
-            log.info(f"Load hosts file '{config_path}'")
             hosts.update(self.parse_hosts_file(config_path))
         return hosts
 
@@ -265,6 +269,11 @@ class LocalHostsPlugin(object):
         if not host:
             return True
 
+        if qmsg.qtype == dns.rdatatype.AAAA and host == self._ipv4_local:
+            host = self._ipv6_local
+        elif qmsg.qtype == dns.rdatatype.A and host == self._ipv6_local:
+            host = self._ipv4_local
+
         log.debug(f"Domain '{name}' in local hosts, host is '{host}'")
         ip_addr = ipaddress.ip_address(host)
         if qmsg.qtype == dns.rdatatype.A and ip_addr.version == 4:
@@ -280,8 +289,8 @@ class LocalHostsPlugin(object):
                 host,
             )
         else:
-            log.warning(f"Unsupported qtype '{qmsg.qtype}', "
-                        f"and ip address version '{ip_addr.version}'")
+            log.warning(f"Local query '{name}' host is IPv{ip_addr.version}, "
+                        f"not support {qtype2text(qmsg.qtype)} qtype")
             return True
 
         rrset = dns.rrset.RRset(qmsg.qname, qmsg.qclass, qmsg.qtype)
@@ -295,7 +304,7 @@ class LocalHostsPlugin(object):
 
 class ForeignResolverPlugin(object):
 
-    def __init__(self, nameservers=None, timeout=5):
+    def __init__(self, nameservers=None, timeout=3):
         self.nameservers = nameservers or [
             ("8.8.8.8", 53)
             ("1.1.1.1", 53)

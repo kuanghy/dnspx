@@ -40,6 +40,9 @@ NAMESERVERS = [
     "114.114.114.110",  # 114DNS 拦截色情网站
 ]
 
+# 往上游服务器查询的超时时间
+QUERY_TIMEOUT = 3
+
 # 开启 DNS 缓存
 ENABLE_DNS_CACHE = True
 DNS_CACHE_SIZE = 1024
