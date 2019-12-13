@@ -1,0 +1,43 @@
+# dnspx configuration
+
+# DNS 服务器
+nameservers:
+    - "119.29.29.29"
+    - "223.5.5.5"
+    - "114.114.114.114"
+    - ["1.1.1.1", 53, "foreign"]
+    - ["8.8.8.8", 53, "foreign"]
+    - ["208.67.222.222", 53, "foreign"]
+
+# 向 DNS 服务器查询时的超时时间
+query_timeout: 3
+
+# 开启查询缓存
+enable_dns_cache: true
+dns_cache_size: 1024
+
+# 开启本地 hosts 文件支持
+enable_local_hosts: true
+local_hosts_path: null
+
+# 开启海外域名用海外 DNS 解析功能
+enable_foreign_resolve: true
+foreign_domains:
+    - "google.com"
+    - "youtube.com"
+    - "github.com"
+    - "github.io"
+    - "full:wikipedia.org"
+    - "full:www.wikipedia.org"
+    - "python.org"
+    - "bitbucket.org"
+    - "gnome-look.org"
+
+# 服务监听地址
+server_listen: "127.0.0.1:53"
+
+# 服务器运行的进程优先级，值为 -20 到 19，仅 Unix 环境有效
+process_priority: 0
+
+# 日志相关配置
+loglevel: "info"

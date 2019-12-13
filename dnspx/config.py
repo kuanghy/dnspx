@@ -79,7 +79,7 @@ FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
 # 服务监听地址
 SERVER_LISTEN = "127.0.0.1:53"
 
-# 服务器运行的进程优先级，值为 20 到 19，仅 Unix 环境有效
+# 服务器运行的进程优先级，值为 -20 到 19，仅 Unix 环境有效
 PROCESS_PRIORITY = 0
 
 # 开启邮件报告功能，以通过邮件报告运行错误或者运行结果
@@ -131,6 +131,8 @@ EMAIL_TOADDRS = []    # 收件人列表
 # 配置文件目录
 _CONFIG_DIRS = [
     '/etc/dnspx/',
+    '/usr/local/etc/dnspx',
+    _os.path.join(USER_HOME, '.local', 'etc', 'dnspx'),
     _os.path.join(USER_HOME, '.config', 'dnspx'),
     _os.getenv("PWD"),
 ]
@@ -145,7 +147,7 @@ def _get_default_config_paths():
         _os.path.join(config_dir, f"dnspx{suffix}")
         for config_dir in _CONFIG_DIRS
         for suffix in suffixes
-        if config_dir
+        if config_dir and _os.path.exists(config_dir)
     ]
 
 
@@ -156,15 +158,24 @@ def _parse_yaml_config_file(path):
         _log.error("Got a yaml config file, but no yaml package")
         return
 
+    try:
+        from yaml import CLoader as Loader
+    except ImportError:
+        from yaml import Loader
+
     with open(path) as fp:
-        _config = yaml.load(fp)
+        _config = yaml.load(fp, Loader=Loader)
     globals().update({key.upper(): val for key, val in _config.items()})
 
 
 def _parse_config_file(path):
-    with open(path) as fp:
-        code = compile(fp.read(), path, "exec")
-    exec(code, globals(), globals())
+    _, fileext = _os.path.splitext(path)
+    if fileext in {".yml", ".yaml"}:
+        _parse_yaml_config_file(path)
+    else:
+        with open(path) as fp:
+            code = compile(fp.read(), path, "exec")
+        exec(code, globals(), globals())
 
 
 def load_config(path=None, reset=False):
@@ -182,11 +193,7 @@ def load_config(path=None, reset=False):
         if not path or not _os.path.exists(path):
             continue
         _log.debug("Load config: %s", path)
-        _, fileext = _os.path.splitext(path)
-        if fileext in {".yml", ".yaml"}:
-            _parse_yaml_config_file(path)
-        else:
-            _parse_config_file(path)
+        _parse_config_file(path)
 
     _HAS_BEEN_LOADED = True
     return _sys.modules[__name__]
