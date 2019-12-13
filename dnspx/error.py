@@ -3,11 +3,32 @@
 # Copyright (c) Huoty, All rights reserved
 # Author: Huoty <sudohuoty@163.com>
 
+
+class Error(Exception):
+    """Base error"""
+
+    msg = None
+
+    def __init__(self, *args, **kwargs):
+        if self.msg is None:
+            self.msg = self.__doc__
+        if args or kwargs:
+            super().__init__(*args, **kwargs)
+        else:
+            super().__init__(self.msg)
+
+
+class DNSError(Error):
+    """The DNS error"""
+
+
 try:
     from dns.exception import Timeout as DNSTimeout
 except ImportError:
-    DNSTimeout = type("DNSTimeout", (Exception,), {})
 
-DNSError = type("DNSError", (Exception,), {})
+    class DNSTimeout(Error):
+        """The DNS operation timed out"""
 
-PluginExistsError = type("PluginExistsError", (Exception,), {})
+
+class PluginExistsError(Error):
+    """The plugin not exists"""
