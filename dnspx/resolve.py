@@ -309,8 +309,8 @@ class ForeignResolverPlugin(object):
 
     def __init__(self, nameservers=None, timeout=3):
         self.nameservers = nameservers or [
-            ("8.8.8.8", 53)
-            ("1.1.1.1", 53)
+            ("8.8.8.8", 53)  # Google Public DNS
+            ("1.1.1.1", 53)  # CloudFlare DNS
         ]
         self.timeout = timeout
 

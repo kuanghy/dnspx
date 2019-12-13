@@ -32,6 +32,11 @@ NAMESERVERS = [
     ("117.50.10.10", "53", "inland", "OneDNS 纯净版"),
     ("1.1.1.1", "53", "foreign", "CloudFlare DNS，号称全球最快的 DNS 服务"),
     ("8.8.8.8", "53", "foreign", "Google Public DNS"),
+    ("208.67.222.222", "53", "foreign", "OpenDNS"),
+    ("199.85.126.30", "53", "foreign", "Norton ConnectSafe DNS C"),
+    ("199.85.126.20", "53", "foreign", "Norton ConnectSafe DNS B"),
+    ("199.85.126.10", "53", "foreign", "Norton ConnectSafe DNS A"),
+    ("84.200.69.80", "53", "foreign", "DNS.WATCH"),
     ("1.0.0.1", "53", "foreign", "CloudFlare DNS 备用地址"),
     ("8.8.4.4", "53", "foreign", "Google Public DNS 备用地址"),
     "223.6.6.6",  # Public DNS+ 备用地址
