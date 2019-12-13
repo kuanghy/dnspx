@@ -61,12 +61,19 @@ LOCAL_HOSTS_PATH = None  # 可以为目录或者文件
 ENABLE_FOREIGN_RESOLVER = True
 FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
     "google.com",
+    "youtube.com",
     "github.com",
     "github.io",
+    "full:wikipedia.org",
+    "full:www.wikipedia.org",
+    "python.org",
+    "bitbucket.org",
+    "gnome-look.org",
+
     # "sina.com",  # 部分匹配，匹配 sina.com、sina.com.cn、www.sina.com 等
     # "full:google.com",  # 完全匹配，仅匹配 google.com
     # "domain:google.com",  # 子域名匹配，匹配 xxx.google.com, yyy.google.com 等
-    # "ext:/etc/dnspx/foreign-domains",  # 重外部文件中读取配置
+    # "ext:/etc/dnspx/foreign-domains",  # 从外部文件中读取配置
 ]
 
 # 服务监听地址
