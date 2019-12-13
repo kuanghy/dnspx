@@ -72,16 +72,15 @@ def main(args=None):
     server_address = parse_ip_port(args.listen or config.SERVER_LISTEN)
     if args.nameserver:
         nameservers = []
-        for server in args.nameserver:
+        for server in args.nameserver.split(","):
             ip, port = parse_ip_port(server)
             nameservers.append((ip, port or 53))
     else:
         nameservers = None
-    if args.hosts_path:
-        config.LOCAL_HOSTS_PATH = args.hosts_path
     server = DNSProxyServer(
         server_address,
         nameservers=nameservers,
+        hosts_path=args.hosts_path,
         enable_tcp=args.enable_tcp,
         enable_ipv6=args.enable_ipv6,
     )

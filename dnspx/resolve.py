@@ -24,27 +24,42 @@ from cacheout import Cache
 
 from . import config
 from .utils import cached_property, thread_sync
-from .error import DNSError, PluginExistsError
+from .error import DNSTimeout, DNSError, PluginExistsError
 
 
 log = logging.getLogger(__name__)
 
 
-def proxy_dns_query(qmsg, host, port=53, timeout=3):
-    if qmsg.qprotocol == "udp":
-        amsg = dns.query.udp(qmsg, host, port=port, timeout=timeout)
-    elif qmsg.qprotocol == "tcp":
-        amsg = dns.query.tcp(qmsg, host, port=port, timeout=timeout)
+def proxy_dns_query(qmsg, nameservers, timeout=3):
+    if qmsg.qprotocol not in {"udp", "tcp"}:
+        raise DNSError(f"unsupported dns query protocol '{qmsg.qprotocol}'")
+
+    for host, port, *_ in nameservers:
+        question_str = f"@{host}:{port} {qmsg.id} {qmsg.question_str}"
+        try:
+            if qmsg.qprotocol == "udp":
+                amsg = dns.query.udp(qmsg, host, port=port, timeout=timeout)
+            else:
+                amsg = dns.query.tcp(qmsg, host, port=port, timeout=timeout)
+        except Exception as e:
+            _log = log.exception
+            if isinstance(e, (OSError, DNSTimeout)):
+                _log = log.warning
+            _log(f"Proxy query failed, question: {question_str}, "
+                 f"msg: {e}")
+        else:
+            log.debug(f"Proxy query successful, question: {question_str}")
+            break
     else:
-        raise DNSError(f"unsupported protocol '{qmsg.qprotocol}'")
+        raise DNSError("no servers could be reached")
+
     return amsg
 
 
 class DNSResolver(object):
 
-    def __init__(self, nameservers=None, hosts=None, timeout=3):
+    def __init__(self, nameservers=None, timeout=3):
         self._nameservers = nameservers or []
-        self.hosts = hosts
         self.timeout = timeout
 
     @thread_sync()
@@ -83,11 +98,10 @@ class DNSResolver(object):
 
     @thread_sync()
     def _initialize_plugins(self):
-        log.info("Initializing plugins")
         plugins = OrderedDict()
         if config.ENABLE_LOCAL_HOSTS:
             self._mount_plugin(
-                plugins, "local_hosts", LocalHostsPlugin(self.hosts)
+                plugins, "local_hosts", LocalHostsPlugin()
             )
         if config.ENABLE_FOREIGN_RESOLVER:
             self._mount_plugin(
@@ -150,12 +164,11 @@ class DNSResolver(object):
         key = self._get_cache_key(name, qclass, qtype)
         return self.query_cache.get(key)
 
-    def _proxy_query(self, qmsg, host, port=53):
-        return proxy_dns_query(qmsg, host, port, self.timeout)
+    def _proxy_query(self, qmsg):
+        return proxy_dns_query(qmsg, self.nameservers, self.timeout)
 
     def query(self, qmsg):
         name = qmsg.qname_str
-        qid = qmsg.id
         qclass = qmsg.qclass
         qtype = qmsg.qtype
         question_str = qmsg.question_str
@@ -175,21 +188,9 @@ class DNSResolver(object):
                         self.set_cache(name, qclass, qtype, ret)
                     return ret
 
-        for host, port, *_ in self.nameservers:
-            try:
-                amsg = self._proxy_query(qmsg, host, port)
-            except Exception as e:
-                log.exception(f"Proxy query error, question: @{host}:{port} {qid} "
-                          f"{question_str}, msg: {e}")
-            else:
-                log.debug(f"Proxy query successful, used dns '{host}:{port}'")
-                break
-        else:
-            raise DNSError("no servers could be reached")
-
+        amsg = self._proxy_query(qmsg)
         if is_query_op and enable_dns_cache:
             self.set_cache(name, qclass, qtype, amsg)
-
         return amsg
 
 
@@ -204,34 +205,41 @@ class LocalHostsPlugin(object):
     def get_sys_hosts_path(self):
         return "/etc/hosts"
 
+    @staticmethod
+    def fetch_config_files(path):
+        if os.path.isfile(path):
+            return [path]
+
+        config_paths = []
+        for sub_path in glob.iglob(os.path.join(path, "*")):
+            if os.path.isfile(sub_path):
+                config_paths.append(sub_path)
+        return config_paths
+
     def get_hosts_config_paths(self):
         config_paths = [
             self.get_sys_hosts_path()
         ]
-
-        def fetch_config_file(directory):
-            for path in glob.iglob(os.path.join(sub_config_dir, "*")):
-                if not os.path.isfile(path):
-                    continue
-                config_paths.append(path)
 
         for config_dir in config._CONFIG_DIRS:
             if not config_dir or os.path.exists(config_dir):
                 continue
             config_paths.append(os.path.join(config_dir, "hosts"))
             sub_config_dir = os.path.join(config_dir, "hosts.conf.d")
-            fetch_config_file(sub_config_dir)
+            config_paths.extend(self.fetch_config_files(sub_config_dir))
 
         if config.LOCAL_HOSTS_PATH:
-            if os.path.isdir(config.LOCAL_HOSTS_PATH):
-                fetch_config_file(config.LOCAL_HOSTS_PATH)
-            else:
-                config_paths.append(config.LOCAL_HOSTS_PATH)
+            config_paths.extend(
+                self.fetch_config_files(config.LOCAL_HOSTS_PATH)
+            )
 
         return config_paths
 
     def parse_hosts_file(self, path):
         hosts = {}
+        if not path or not os.path.exists(path):
+            return hosts
+
         with open(path) as fp:
             for line in fp:
                 line = line.strip()
@@ -251,17 +259,12 @@ class LocalHostsPlugin(object):
         config_paths = self.get_hosts_config_paths()
         hosts = {}
         for config_path in config_paths:
-            if not config_path or not os.path.exists(config_path):
-                continue
             hosts.update(self.parse_hosts_file(config_path))
         return hosts
 
     @cached_property
     def hosts(self):
-        with thread_sync():
-            host_map = self.get_hosts_from_config()
-            host_map.update(self._hosts)
-        return host_map
+        return {**self.get_hosts_from_config(), **self._hosts}
 
     def __call__(self, qmsg):
         name = qmsg.qname_str
@@ -357,13 +360,10 @@ class ForeignResolverPlugin(object):
             return True
 
         log.debug(f"Domain '{name}' is foreign, using foreign nameserver")
-        for host, port, *_ in self.nameservers:
-            try:
-                amsg = proxy_dns_query(qmsg, host, port, self.timeout)
-            except Exception as e:
-                log.error(f"Proxy dns '{host}:{port}' query error: {e}")
-            else:
-                log.debug(f"Proxy query successful, used dns '{host}:{port}'")
-                return amsg
+        try:
+            amsg = proxy_dns_query(qmsg, self.nameservers, self.timeout)
+        except Exception as e:
+            log.debug(f"Foreign nameservers resolve failed: {e}")
+            return False
 
-        return True
+        return amsg

@@ -15,6 +15,7 @@ import socketserver
 import dns.message
 
 from . import config
+from .utils import cached_property
 from .resolve import DNSResolver
 
 
@@ -78,17 +79,13 @@ class TCPHandler(DNSHandler, socketserver.BaseRequestHandler):
 
 class BaseSocketServer(socketserver.ThreadingMixIn):
 
-    def __init__(self, server_address, RequestHandlerClass, nameservers=None,
+    def __init__(self, server_address, RequestHandlerClass, dns_resolver,
                  ipv6=False):
         super().__init__(server_address, RequestHandlerClass)
 
-        self.nameservers = nameservers
+        self.dns_resolver = dns_resolver
         self.ipv6 = ipv6
         self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
-        self.dns_resolver = DNSResolver(
-            nameservers,
-            timeout=config.QUERY_TIMEOUT,
-        )
 
 
 class ThreadedUDPServer(BaseSocketServer, socketserver.UDPServer):
@@ -106,13 +103,33 @@ class ThreadedTCPServer(BaseSocketServer, socketserver.TCPServer):
 
 class DNSProxyServer(object):
 
-    def __init__(self, server_address, nameservers=None, enable_tcp=False, enable_ipv6=False):
+    def __init__(self, server_address, nameservers=None, hosts_path=None,
+                 enable_tcp=False, enable_ipv6=False):
         self.server_address = server_address
         self.nameservers = nameservers
+        self.hosts_path = hosts_path
         self.enable_tcp = enable_tcp
         self.enable_ipv6 = enable_ipv6
         self._udp_server = None
         self._tcp_server = None
+
+    @cached_property
+    def dns_resolver(self):
+        resolver = DNSResolver(
+            self.nameservers,
+            timeout=config.QUERY_TIMEOUT,
+        )
+        pugins = resolver.plugins
+        local_hosts_plugin = pugins.get("local_hosts")
+        if local_hosts_plugin and self.hosts_path:
+            config_paths = local_hosts_plugin.fetch_config_files(
+                self.hosts_path
+            )
+            hosts = {}
+            for config_path in config_paths:
+                hosts.update(local_hosts_plugin.parse_hosts_file(config_path))
+            local_hosts_plugin.hosts.update(hosts)
+        return resolver
 
     def set_priority(self):
         curr_priority = os.getpriority(os.PRIO_PROCESS, 0)
@@ -149,7 +166,7 @@ class DNSProxyServer(object):
         self._udp_server = ThreadedUDPServer(
             self.server_address,
             UDPHandler,
-            self.nameservers,
+            self.dns_resolver,
             self.enable_ipv6,
         )
         threading.Thread(target=self._udp_server.serve_forever).start()
@@ -158,7 +175,7 @@ class DNSProxyServer(object):
             self._tcp_server = ThreadedTCPServer(
                 self.server_address,
                 TCPHandler,
-                self.nameservers,
+                self.dns_resolver,
                 self.enable_ipv6
             )
             threading.Thread(target=self._tcp_server.serve_forever).start()
