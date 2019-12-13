@@ -223,7 +223,7 @@ class LocalHostsPlugin(object):
         ]
 
         for config_dir in config._CONFIG_DIRS:
-            if not config_dir or os.path.exists(config_dir):
+            if not config_dir or not os.path.exists(config_dir):
                 continue
             config_paths.append(os.path.join(config_dir, "hosts"))
             sub_config_dir = os.path.join(config_dir, "hosts.conf.d")
