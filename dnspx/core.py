@@ -127,15 +127,15 @@ class DNSProxyServer(object):
             timeout=config.QUERY_TIMEOUT,
         )
         pugins = resolver.plugins
-        local_hosts_plugin = pugins.get("local_hosts")
-        if local_hosts_plugin and self.hosts_path:
-            config_paths = local_hosts_plugin.fetch_config_files(
-                self.hosts_path
-            )
-            hosts = {}
-            for config_path in config_paths:
-                hosts.update(local_hosts_plugin.parse_hosts_file(config_path))
-            local_hosts_plugin.hosts.update(hosts)
+        hosts_plugin = pugins.get("local_hosts")
+        if hosts_plugin:
+            if self.hosts_path:
+                config_paths = hosts_plugin.fetch_config_files(self.hosts_path)
+                hosts = {}
+                for config_path in config_paths:
+                    hosts.update(hosts_plugin.parse_hosts_file(config_path))
+                hosts_plugin.hosts.update(hosts)
+            log.debug("All local hosts size %s", len(hosts_plugin.hosts))
         return resolver
 
     def set_priority(self):
