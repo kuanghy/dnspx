@@ -32,7 +32,7 @@ from cacheout import Cache
 
 from . import config
 from .utils import cached_property, thread_sync
-from .error import DNSTimeout, DNSError, PluginExistsError
+from .error import DNSTimeout, DNSUnreachableError, PluginExistsError
 
 
 log = logging.getLogger(__name__)
@@ -173,14 +173,13 @@ def proxy_dns_query(qmsg, nameservers, timeout=3):
             _log = log.exception
             if isinstance(e, (OSError, DNSTimeout)):
                 _log = log.warning
-            _log(f"Proxy query failed, question: {question_str}, "
-                 f"msg: {e}")
+            _log(f"Proxy query failed, question: {question_str}, msg: {e}")
         else:
             log.debug(f"Proxy query successful, question: {question_str}, "
                       f"take {(response_time * 1000):.2f} msec")
             break
     else:
-        raise DNSError("no servers could be reached")
+        raise DNSUnreachableError("no servers could be reached")
 
     return amsg
 

@@ -26,8 +26,12 @@ try:
     from dns.exception import Timeout as DNSTimeout
 except ImportError:
 
-    class DNSTimeout(Error):
+    class DNSTimeout(DNSError):
         """The DNS operation timed out"""
+
+
+class DNSUnreachableError(DNSError):
+    """no servers could be reached"""
 
 
 class PluginExistsError(Error):

@@ -18,6 +18,7 @@ from dns.message import Message as DNSMessage
 from . import config
 from .utils import cached_property
 from .resolve import DNSResolver
+from .error import DNSTimeout, DNSUnreachableError
 
 
 log = logging.getLogger(__name__)
@@ -48,8 +49,10 @@ class DNSHandler():
             amsg = self.server.dns_resolver.query(qmsg)
             response = amsg.to_wire() if isinstance(amsg, DNSMessage) else amsg
         except Exception as e:
-            log.error(f"DNS query error, query message: \n{qmsg}")
-            log.exception(e)
+            _log = log.exception
+            if isinstance(e, (DNSTimeout, DNSUnreachableError)):
+                _log = log.warning
+            _log(f"DNS query failed, question: {qmsg.question_str}, msg: {e}")
 
         return response
 
