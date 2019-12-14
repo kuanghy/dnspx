@@ -315,9 +315,11 @@ class DNSResolver(object):
                     if enable_dns_cache:
                         self.set_cache(name, qclass, qtype, ret)
                     return ret
+                elif isinstance(ret, bytes):
+                    return ret
 
         amsg = self._proxy_query(qmsg)
-        if is_query_op and enable_dns_cache:
+        if isinstance(amsg, DNSMessage) and is_query_op and enable_dns_cache:
             self.set_cache(name, qclass, qtype, amsg)
         return amsg
 
