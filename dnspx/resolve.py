@@ -4,7 +4,10 @@
 # Author: Huoty <sudohuoty@163.com>
 
 import os
+import time
 import glob
+import socket
+import struct
 import logging
 import ipaddress
 from collections import namedtuple, OrderedDict
@@ -17,8 +20,13 @@ import dns.rdataclass
 import dns.rrset
 import dns.rdtypes.IN.A
 import dns.rdtypes.IN.AAAA
-from dns.message import Message as DNSMessage
+from dns.message import Message as DNSMessage, BadEDNS as BadEDNSMessage
 from dns.rdatatype import to_text as qtype2text
+
+try:
+    import socks as pysocks
+except ImportError:
+    pysocks = None
 
 from cacheout import Cache
 
@@ -30,17 +38,137 @@ from .error import DNSTimeout, DNSError, PluginExistsError
 log = logging.getLogger(__name__)
 
 
-def proxy_dns_query(qmsg, nameservers, timeout=3):
-    if qmsg.qprotocol not in {"udp", "tcp"}:
-        raise DNSError(f"unsupported dns query protocol '{qmsg.qprotocol}'")
+class _UDPQuery(object):
 
-    for host, port, *_ in nameservers:
-        question_str = f"@{host}:{port} {qmsg.id} {qmsg.question_str}"
+    def __init__(self, qmsg, nameserver, proxyserver=None,
+                 socket_family=socket.AF_INET, timeout=10):
+        self.qmsg = qmsg
+        self.nameserver = nameserver
+        self.proxyserver = proxyserver
+        self.socket_family = socket_family
+        self.timeout = timeout
+        self.socket = None
+        self.adata = b''
+
+    @cached_property
+    def socket_type(self):
+        return socket.SOCK_DGRAM
+
+    @property
+    def qdata(self):
+        if isinstance(self.qmsg, DNSMessage):
+            data = self.qmsg.to_wire()
+        else:
+            data = self.qmsg
+        return data
+
+    def _convert_message(self, wire):
         try:
-            if qmsg.qprotocol == "udp":
-                amsg = dns.query.udp(qmsg, host, port=port, timeout=timeout)
+            msg = dns.message.from_wire(wire)
+        except (BadEDNSMessage) as e:
+            if isinstance(self.qmsg, DNSMessage):
+                question_str = self.qmsg.question_str
+                warn_msg = (f"convert wire failed, question: {question_str}, "
+                            f"msg: {e}")
             else:
-                amsg = dns.query.tcp(qmsg, host, port=port, timeout=timeout)
+                warn_msg = f"convert wire failed: {e}"
+            log.warning(warn_msg)
+            msg = wire
+        return msg
+
+    @property
+    def amsg(self):
+        return self._convert_message(self.adata)
+
+    def make_socket(self):
+        if self.proxyserver and pysocks:
+            sock = pysocks.socksocket(self.socket_family, self.socket_type, 0)
+            sock.set_proxy(*self.proxyserver[:3])
+        else:
+            sock = socket.socket(self.socket_family, self.socket_type, 0)
+        sock.setblocking(0)
+        address = self.nameserver[:2]
+        sock.connect(address)
+        self.socket = sock
+        return sock
+
+    def get_sock(self):
+        return self.socket
+
+    def compute_expiration(self, timeout=None):
+        return dns.query._compute_expiration(
+            self.timeout if timeout is None else timeout
+        )
+
+    def send_msg(self, expiration=None):
+        sock = self.get_sock()
+        dns.query._wait_for_writable(sock, expiration)
+        sent_time = time.time()
+        length = sock.sendall(self.qdata)
+        return length, sent_time
+
+    def receive_msg(self, expiration=None):
+        sock = self.get_sock()
+        dns.query._wait_for_readable(sock, expiration)
+        wire = sock.recv(65535)
+        received_time = time.time()
+        self.adata += wire
+        return wire, received_time
+
+    def get(self):
+        return self.amsg
+
+    def __call__(self, timeout=None):
+        self.make_socket()
+        self.adata = b''
+        expiration = self.compute_expiration()
+        _, sent_time = self.send_msg(expiration)
+        _, received_time = self.receive_msg(expiration)
+        self.socket.close()
+        response_time = received_time - sent_time
+        amsg = self.amsg
+        if isinstance(amsg, DNSMessage):
+            amsg.time = response_time
+            if (isinstance(self.qmsg, DNSMessage) and
+                    not self.qmsg.is_response(amsg)):
+                raise dns.query.BadResponse
+        return amsg, response_time
+
+
+class _TCPQuery(_UDPQuery):
+
+    @cached_property
+    def socket_type(self):
+        return socket.SOCK_STREAM
+
+    @property
+    def qdata(self):
+        if isinstance(self.qmsg, DNSMessage):
+            data = self.qmsg.to_wire()
+            data = struct.pack('!H', len(data)) + data
+        else:
+            data = self.qmsg
+        return data
+
+    @property
+    def amsg(self):
+        return self._convert_message(self.adata[2:])
+
+
+def proxy_dns_query(qmsg, nameservers, timeout=3):
+    qsocket_type = qmsg.qsocket_type
+    for nameserver in nameservers:
+        host, port, *_ = nameserver
+        question_str = f"@{host}:{port} {qmsg.id} {qmsg.question_str}"
+        Query = _UDPQuery if qsocket_type == socket.SOCK_DGRAM else _TCPQuery
+        query = Query(
+            qmsg, nameserver,
+            proxyserver=None,
+            socket_family=qmsg.qsocket_family,
+            timeout=timeout
+        )
+        try:
+            amsg, response_time = query()
         except Exception as e:
             _log = log.exception
             if isinstance(e, (OSError, DNSTimeout)):
@@ -49,7 +177,7 @@ def proxy_dns_query(qmsg, nameservers, timeout=3):
                  f"msg: {e}")
         else:
             log.debug(f"Proxy query successful, question: {question_str}, "
-                      f"take {(amsg.time * 1000):.2f} msec")
+                      f"take {(response_time * 1000):.2f} msec")
             break
     else:
         raise DNSError("no servers could be reached")

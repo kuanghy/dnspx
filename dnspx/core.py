@@ -13,6 +13,7 @@ import threading
 import socketserver
 
 import dns.message
+from dns.message import Message as DNSMessage
 
 from . import config
 from .utils import cached_property
@@ -35,7 +36,8 @@ class DNSHandler():
             qmsg.question_str = "; ".join(str(q) for q in qmsg.question)
             qmsg.qtype = question.rdtype
             qmsg.qclass = question.rdclass
-            qmsg.qprotocol = self.server.server_type
+            qmsg.qsocket_family = self.server.address_family  # IPv4 or IPv6
+            qmsg.qsocket_type = self.server.socket_type  # UDP or TCP
         except Exception:
             log.error(f"{client} query error: invalid DNS request")
             return response
@@ -44,7 +46,7 @@ class DNSHandler():
                  f"{qmsg.question_str}")
         try:
             amsg = self.server.dns_resolver.query(qmsg)
-            response = amsg.to_wire()
+            response = amsg.to_wire() if isinstance(amsg, DNSMessage) else amsg
         except Exception as e:
             log.error(f"DNS query error, query message: \n{qmsg}")
             log.exception(e)
@@ -80,28 +82,26 @@ class TCPHandler(DNSHandler, socketserver.BaseRequestHandler):
 class BaseSocketServer(socketserver.ThreadingMixIn):
 
     def __init__(self, server_address, RequestHandlerClass, dns_resolver,
-                 ipv6=False):
+                 address_family=socket.AF_INET):
         super().__init__(server_address, RequestHandlerClass)
 
         self.dns_resolver = dns_resolver
-        self.ipv6 = ipv6
-        self.address_family = socket.AF_INET6 if self.ipv6 else socket.AF_INET
+        self.address_family = address_family
 
 
 class ThreadedUDPServer(BaseSocketServer, socketserver.UDPServer):
-
-    server_type = "udp"
+    """多线程 UDP 服务器"""
 
 
 class ThreadedTCPServer(BaseSocketServer, socketserver.TCPServer):
-
-    server_type = "tcp"
+    """多线程 TCP 服务器"""
 
     # 允许地址重用
     allow_reuse_address = True
 
 
 class DNSProxyServer(object):
+    """DNS 代理服务器"""
 
     def __init__(self, server_address, nameservers=None, hosts_path=None,
                  enable_tcp=False, enable_ipv6=False):
@@ -112,6 +112,10 @@ class DNSProxyServer(object):
         self.enable_ipv6 = enable_ipv6
         self._udp_server = None
         self._tcp_server = None
+
+    @property
+    def socket_family(self):
+        return socket.AF_INET6 if self.enable_ipv6 else socket.AF_INET
 
     @cached_property
     def dns_resolver(self):
@@ -167,7 +171,7 @@ class DNSProxyServer(object):
             self.server_address,
             UDPHandler,
             self.dns_resolver,
-            self.enable_ipv6,
+            self.socket_family,
         )
         threading.Thread(target=self._udp_server.serve_forever).start()
         if self.enable_tcp:
@@ -176,7 +180,7 @@ class DNSProxyServer(object):
                 self.server_address,
                 TCPHandler,
                 self.dns_resolver,
-                self.enable_ipv6
+                self.socket_family
             )
             threading.Thread(target=self._tcp_server.serve_forever).start()
         log.info("DNSPX server started on address '%s:%s'",
