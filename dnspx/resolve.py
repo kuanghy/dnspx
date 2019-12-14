@@ -21,6 +21,7 @@ import dns.rrset
 import dns.rdtypes.IN.A
 import dns.rdtypes.IN.AAAA
 from dns.message import Message as DNSMessage, BadEDNS as BadEDNSMessage
+from dns.query import BadResponse as BadDNSResponse
 from dns.rdatatype import to_text as qtype2text
 
 try:
@@ -131,7 +132,7 @@ class _UDPQuery(object):
             amsg.time = response_time
             if (isinstance(self.qmsg, DNSMessage) and
                     not self.qmsg.is_response(amsg)):
-                raise dns.query.BadResponse
+                raise BadDNSResponse
         return amsg, response_time
 
 
@@ -171,7 +172,7 @@ def proxy_dns_query(qmsg, nameservers, timeout=3):
             amsg, response_time = query()
         except Exception as e:
             _log = log.exception
-            if isinstance(e, (OSError, DNSTimeout)):
+            if isinstance(e, (OSError, DNSTimeout, BadDNSResponse)):
                 _log = log.warning
             _log(f"Proxy query failed, question: {question_str}, msg: {e}")
         else:
