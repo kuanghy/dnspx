@@ -36,6 +36,9 @@ from .utils import cached_property, thread_sync
 from .error import DNSTimeout, DNSUnreachableError, PluginExistsError
 
 
+QTYPE_A = dns.rdatatype.A
+QTYPE_AAAA = dns.rdatatype.AAAA
+
 log = logging.getLogger(__name__)
 
 
@@ -310,7 +313,7 @@ class DNSResolver(object):
                     log.debug(f"Query '{question_str}' cache is valid, use it")
                     data.id = qmsg.id
                     return data
-            if qtype in {dns.rdatatype.A,  dns.rdatatype.AAAA}:
+            if qtype in {QTYPE_A,  QTYPE_AAAA}:
                 ret = self.run_plugins(qmsg)
                 if isinstance(ret, DNSMessage):
                     if enable_dns_cache:
@@ -403,23 +406,23 @@ class LocalHostsPlugin(object):
         if not host:
             return True
 
-        if qmsg.qtype == dns.rdatatype.AAAA and host == self._ipv4_local:
+        if qmsg.qtype == QTYPE_AAAA and host == self._ipv4_local:
             host = self._ipv6_local
-        elif qmsg.qtype == dns.rdatatype.A and host == self._ipv6_local:
+        elif qmsg.qtype == QTYPE_A and host == self._ipv6_local:
             host = self._ipv4_local
 
         log.debug(f"Domain '{name}' in local hosts, host is '{host}'")
         ip_addr = ipaddress.ip_address(host)
-        if qmsg.qtype == dns.rdatatype.A and ip_addr.version == 4:
+        if qmsg.qtype == QTYPE_A and ip_addr.version == 4:
             rd = dns.rdtypes.IN.A.A(
                 dns.rdataclass.IN,
-                dns.rdatatype.A,
+                QTYPE_A,
                 host,
             )
-        elif qmsg.qtype == dns.rdatatype.AAAA and ip_addr.version == 6:
+        elif qmsg.qtype == QTYPE_AAAA and ip_addr.version == 6:
             rd = dns.rdtypes.IN.AAAA.AAAA(
                 dns.rdataclass.IN,
-                dns.rdatatype.AAAA,
+                QTYPE_AAAA,
                 host,
             )
         else:
