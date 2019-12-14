@@ -42,7 +42,7 @@ setup_args = dict(
 def get_version():
     scope = {}
     version = '1.0'
-    version_file = path_join(CURRDIR, "jqfactorbase", "version.py")
+    version_file = path_join(CURRDIR, "dnspx", "version.py")
     if os.path.exists(version_file):
         with open(version_file) as fp:
             exec(fp.read(), scope)
