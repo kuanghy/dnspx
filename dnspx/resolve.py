@@ -303,10 +303,13 @@ class DNSResolver(object):
         name = qmsg.qname_str
         qclass = qmsg.qclass
         qtype = qmsg.qtype
+        is_multi_question = qmsg.question_len > 1
         question_str = qmsg.question_str
         is_query_op = (qmsg.opcode() == dns.opcode.QUERY)
         enable_dns_cache = config.ENABLE_DNS_CACHE
-        if is_query_op:
+
+        # 仅对单个请求，且是 Query 查询操作时，执行插件和缓存查询
+        if not is_multi_question and is_query_op:
             if enable_dns_cache:
                 data = self.get_cache(name, qclass, qtype)
                 if data:
@@ -323,7 +326,8 @@ class DNSResolver(object):
                     return ret
 
         amsg = self._proxy_query(qmsg)
-        if isinstance(amsg, DNSMessage) and is_query_op and enable_dns_cache:
+        if (enable_dns_cache and is_multi_question and is_query_op and
+                isinstance(amsg, DNSMessage)):
             self.set_cache(name, qclass, qtype, amsg)
         return amsg
 

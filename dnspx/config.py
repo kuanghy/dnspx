@@ -46,7 +46,7 @@ NAMESERVERS = [
 ]
 
 # 往上游服务器查询的超时时间
-QUERY_TIMEOUT = 3
+QUERY_TIMEOUT = 2
 
 # 开启 DNS 缓存
 ENABLE_DNS_CACHE = True

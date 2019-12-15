@@ -32,6 +32,7 @@ class DNSHandler():
         try:
             qmsg = dns.message.from_wire(message)
             question = qmsg.question[-1]
+            qmsg.question_len = len(question)
             qmsg.qname = question.name
             qmsg.qname_str = question.name.to_text().strip('.')
             qmsg.question_str = "; ".join(str(q) for q in qmsg.question)
