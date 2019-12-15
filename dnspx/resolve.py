@@ -6,11 +6,13 @@
 import os
 import time
 import glob
+import random
 import socket
 import struct
 import logging
 import ipaddress
 from collections import namedtuple, OrderedDict
+from urllib.parse import urlparse
 
 import dns.query
 import dns.message
@@ -87,7 +89,14 @@ class _UDPQuery(object):
     def make_socket(self):
         if self.proxyserver and pysocks:
             sock = pysocks.socksocket(self.socket_family, self.socket_type, 0)
-            sock.set_proxy(*self.proxyserver[:3])
+            sock.set_proxy(
+                proxy_type=getattr(pysocks, self.proxyserver.scheme.upper()),
+                addr=self.proxyserver.hostname,
+                port=self.proxyserver.port,
+                rdns=True,
+                username=self.proxyserver.username,
+                password=self.proxyserver.password,
+            )
         else:
             sock = socket.socket(self.socket_family, self.socket_type, 0)
         sock.setblocking(0)
@@ -159,7 +168,10 @@ class _TCPQuery(_UDPQuery):
         return self._convert_message(self.adata[2:])
 
 
-def proxy_dns_query(qmsg, nameservers, timeout=3):
+def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
+    if proxyserver:
+        log.debug(f"Use proxy '{proxyserver.geturl()}' for question "
+                  f"'{qmsg.question_str}'")
     qsocket_type = qmsg.qsocket_type
     for nameserver in nameservers:
         host, port, *_ = nameserver
@@ -167,7 +179,7 @@ def proxy_dns_query(qmsg, nameservers, timeout=3):
         Query = _UDPQuery if qsocket_type == socket.SOCK_DGRAM else _TCPQuery
         query = Query(
             qmsg, nameserver,
-            proxyserver=None,
+            proxyserver=proxyserver,
             socket_family=qmsg.qsocket_family,
             timeout=timeout
         )
@@ -296,8 +308,23 @@ class DNSResolver(object):
         key = self._get_cache_key(name, qclass, qtype)
         return self.query_cache.get(key)
 
+    @cached_property
+    def _socks_proxies(self):
+        proxies = set(config.PROXY_SERVERS or [])
+        return list(urlparse(proxy) for proxy in proxies)
+
+    @property
+    def proxyserver(self):
+        return (
+            random.choice(self._socks_proxies) if self._socks_proxies else None
+        )
+
     def _proxy_query(self, qmsg):
-        return proxy_dns_query(qmsg, self.nameservers, self.timeout)
+        return proxy_dns_query(
+            qmsg, self.nameservers,
+            proxyserver=self.proxyserver,
+            timeout=self.timeout
+        )
 
     def query(self, qmsg):
         name = qmsg.qname_str
@@ -452,6 +479,18 @@ class ForeignResolverPlugin(object):
         ]
         self.timeout = timeout
 
+    @cached_property
+    def _socks_proxies(self):
+        proxies = set(config.PROXY_SERVERS or [])
+        foreign_proxies = set(config.FOREIGN_PROXY_SERVERS or [])
+        return list(urlparse(proxy) for proxy in foreign_proxies | proxies)
+
+    @property
+    def proxyserver(self):
+        return (
+            random.choice(self._socks_proxies) if self._socks_proxies else None
+        )
+
     @thread_sync()
     def _fetch_foreign_domains(self):
         patterns = set()
@@ -499,9 +538,13 @@ class ForeignResolverPlugin(object):
 
         log.debug(f"Domain '{name}' is foreign, using foreign nameserver")
         try:
-            amsg = proxy_dns_query(qmsg, self.nameservers, self.timeout)
+            amsg = proxy_dns_query(
+                qmsg, self.nameservers,
+                proxyserver=self.proxyserver,
+                timeout=self.timeout,
+            )
         except Exception as e:
-            log.debug(f"Foreign nameservers resolve failed: {e}")
+            log.warning(f"Foreign nameservers resolve failed: {e}")
             return False
 
         return amsg

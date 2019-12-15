@@ -35,7 +35,7 @@ class DNSHandler():
             qmsg.question_len = len(question)
             qmsg.qname = question.name
             qmsg.qname_str = question.name.to_text().strip('.')
-            qmsg.question_str = "; ".join(str(q) for q in qmsg.question)
+            qmsg.question_str = " & ".join(str(q) for q in qmsg.question)
             qmsg.qtype = question.rdtype
             qmsg.qclass = question.rdclass
             qmsg.qsocket_family = self.server.address_family  # IPv4 or IPv6
