@@ -69,6 +69,7 @@ class _UDPQuery(object):
         return data
 
     def _convert_message(self, wire):
+        # 转换报文数据包到 DNSMessage，如果转换失败则直接返回数据包
         try:
             msg = dns.message.from_wire(wire)
         except (BadEDNSMessage) as e:
@@ -353,7 +354,7 @@ class DNSResolver(object):
                     return ret
 
         amsg = self._proxy_query(qmsg)
-        if (enable_dns_cache and is_multi_question and is_query_op and
+        if (enable_dns_cache and not is_multi_question and is_query_op and
                 isinstance(amsg, DNSMessage)):
             self.set_cache(name, qclass, qtype, amsg)
         return amsg

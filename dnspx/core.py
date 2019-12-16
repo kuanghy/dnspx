@@ -31,6 +31,12 @@ class DNSHandler():
         client = self.client_address[0]
         try:
             qmsg = dns.message.from_wire(message)
+
+            qmsg.qsocket_family = self.server.address_family  # IPv4 or IPv6
+            qmsg.qsocket_type = self.server.socket_type       # UDP or TCP
+
+            # 内置解析器只对有单个 question 的请求做特殊处理，如本地自定义域解析，缓存等
+            # 对于有多个 question 的请求，内置解析器直接做转发处理
             question = qmsg.question[-1]
             qmsg.question_len = len(question)
             qmsg.qname = question.name
@@ -38,8 +44,6 @@ class DNSHandler():
             qmsg.question_str = " & ".join(str(q) for q in qmsg.question)
             qmsg.qtype = question.rdtype
             qmsg.qclass = question.rdclass
-            qmsg.qsocket_family = self.server.address_family  # IPv4 or IPv6
-            qmsg.qsocket_type = self.server.socket_type  # UDP or TCP
         except Exception:
             log.error(f"{client} query error: invalid DNS request")
             return response
