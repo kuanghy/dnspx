@@ -25,6 +25,7 @@ import dns.rdtypes.IN.AAAA
 from dns.message import Message as DNSMessage, BadEDNS as BadEDNSMessage
 from dns.query import BadResponse as BadDNSResponse
 from dns.rdatatype import to_text as qtype2text
+from dns.resolver import Resolver as SystemDNSResolver
 
 try:
     import socks as pysocks
@@ -35,7 +36,7 @@ from cacheout import Cache
 
 from . import config
 from .utils import cached_property, thread_sync
-from .error import DNSTimeout, DNSUnreachableError, PluginExistsError
+from .error import DNSError, DNSTimeout, DNSUnreachableError, PluginExistsError
 
 
 QTYPE_A = dns.rdatatype.A
@@ -207,6 +208,10 @@ class DNSResolver(object):
         self._nameservers = nameservers or []
         self.timeout = timeout
 
+    @cached_property
+    def _sys_resolver(self):
+        return SystemDNSResolver()
+
     @thread_sync()
     def _fetch_nameservers(self):
         servers = []
@@ -292,10 +297,7 @@ class DNSResolver(object):
 
     @cached_property
     def query_cache(self):
-        return Cache(
-            maxsize=config.DNS_CACHE_SIZE,
-            ttl=config.DNS_CACHE_TTL,
-        )
+        return Cache(maxsize=config.DNS_CACHE_SIZE, ttl=config.DNS_CACHE_TTL)
 
     @staticmethod
     def _get_cache_key(qname, qclass, qtype):
@@ -321,11 +323,26 @@ class DNSResolver(object):
         )
 
     def _proxy_query(self, qmsg):
-        return proxy_dns_query(
-            qmsg, self.nameservers,
-            proxyserver=self.proxyserver,
-            timeout=self.timeout
-        )
+        if self.nameservers:
+            try:
+                return proxy_dns_query(
+                    qmsg, self.nameservers,
+                    proxyserver=self.proxyserver,
+                    timeout=self.timeout
+                )
+            except DNSUnreachableError:
+                if not config.ENABLE_SYSTEM_RESOLVER:
+                    raise
+
+        if not config.ENABLE_SYSTEM_RESOLVER:
+            raise DNSError("No name servers")
+
+        return self._sys_resolver.query(
+            qmsg.qname,
+            rdtype=qmsg.qtype,
+            rdclass=dns.rdataclass.IN,
+            tcp=(qmsg.qsocket_type == "tcp")
+        ).response
 
     def query(self, qmsg):
         name = qmsg.qname_str
