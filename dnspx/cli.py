@@ -50,8 +50,8 @@ def parse_arguments(args):
 
 
 def main(args=None):
-    if sys.version_info.major < 3:
-        print("Error, only supports Python3", file=sys.stderr)
+    if sys.version_info < (3, 6):
+        print("Error, only supports Python version 3.6 or later", file=sys.stderr)
         return
 
     args = parse_arguments(args)
