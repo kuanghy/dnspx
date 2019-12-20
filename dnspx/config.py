@@ -12,7 +12,7 @@ IS_WINDOWS = _sys.platform in ['win32', 'cygwin']
 IS_MACOSX = _sys.platform == 'darwin'
 IS_LINUX = _sys.platform.startswith('linux')
 
-IS_UNIX = (IS_LINUX or IS_LINUX)
+IS_UNIX = (IS_MACOSX or IS_LINUX)
 
 
 # 用户主目录
