@@ -60,11 +60,6 @@ def main():
         "PyYAML",
         "cacheout",
     ]
-    setup_args["install_requires"] = [
-        "dnspython",
-        "PyYAML",
-        "cacheout",
-    ]
     setup_args["extras_require"] = {
         "SOCKS": ["pysocks"]
     }
