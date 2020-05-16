@@ -14,7 +14,7 @@ query_timeout: 2
 
 # 开启查询缓存
 enable_dns_cache: true
-dns_cache_size: 1024
+dns_cache_size: 256
 
 # 开启本地 hosts 文件支持
 enable_local_hosts: true

@@ -50,7 +50,7 @@ QUERY_TIMEOUT = 2
 
 # 开启 DNS 缓存
 ENABLE_DNS_CACHE = True
-DNS_CACHE_SIZE = 1024
+DNS_CACHE_SIZE = 256
 DNS_CACHE_TTL = 60 * 60 * 1
 
 # 是否在没有配置 DNS 服务器，或者配置的 DNS 服务器都不可达时，使用系统 DNS 解析器
