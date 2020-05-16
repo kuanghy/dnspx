@@ -48,7 +48,7 @@ log = logging.getLogger(__name__)
 class _UDPQuery(object):
 
     def __init__(self, qmsg, nameserver, proxyserver=None,
-                 socket_family=socket.AF_INET, timeout=10):
+                 socket_family=socket.AF_INET, timeout=3):
         self.qmsg = qmsg
         self.nameserver = nameserver
         self.proxyserver = proxyserver
@@ -101,7 +101,7 @@ class _UDPQuery(object):
             )
         else:
             sock = socket.socket(self.socket_family, self.socket_type, 0)
-        sock.setblocking(0)
+        sock.settimeout(self.timeout)
         address = self.nameserver[:2]
         sock.connect(address)
         self.socket = sock
@@ -110,10 +110,8 @@ class _UDPQuery(object):
     def get_sock(self):
         return self.socket
 
-    def compute_expiration(self, timeout=None):
-        return dns.query._compute_expiration(
-            self.timeout if timeout is None else timeout
-        )
+    def compute_expiration(self):
+        return dns.query._compute_expiration(self.timeout)
 
     def send_msg(self, expiration=None):
         sock = self.get_sock()
@@ -133,7 +131,7 @@ class _UDPQuery(object):
     def get(self):
         return self.amsg
 
-    def __call__(self, timeout=None):
+    def __call__(self):
         self.make_socket()
         self.adata = b''
         expiration = self.compute_expiration()

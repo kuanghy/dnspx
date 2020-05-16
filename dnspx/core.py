@@ -127,10 +127,9 @@ class DNSProxyServer(object):
 
     @cached_property
     def dns_resolver(self):
-        resolver = DNSResolver(
-            self.nameservers,
-            timeout=config.QUERY_TIMEOUT,
-        )
+        timeout = config.QUERY_TIMEOUT
+        log.info("Initializing resolver, timeout is %s seconds", timeout)
+        resolver = DNSResolver(self.nameservers, timeout=timeout)
         pugins = resolver.plugins
         hosts_plugin = pugins.get("local_hosts")
         if hosts_plugin:
