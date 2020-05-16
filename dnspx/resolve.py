@@ -32,7 +32,7 @@ try:
 except ImportError:
     pysocks = None
 
-from cacheout import Cache
+from cacheout import LRUCache as Cache
 
 from . import config
 from .utils import cached_property, thread_sync
