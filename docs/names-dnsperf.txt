@@ -1,0 +1,12 @@
+baidu.com A
+google.com A
+qq.com A
+qq.com MX
+gmail.com MX
+sina.com A
+konghy.cn A
+blog.konghy.cn A
+163.com A
+163.com MX
+taobao.com A
+12306.com A
