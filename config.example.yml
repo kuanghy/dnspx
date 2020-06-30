@@ -27,6 +27,7 @@ foreign_domains:
     - "youtube.com"
     - "github.com"
     - "github.io"
+    - "githubusercontent.com"
     - "full:wikipedia.org"
     - "full:www.wikipedia.org"
     - "python.org"
