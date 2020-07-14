@@ -151,7 +151,15 @@ _HAS_BEEN_LOADED = False
 
 
 def _get_default_config_paths():
-    suffixes = [".py", ".yml", ".yaml"]
+    common_config_suffixes = [".py", ".yml", ".yaml"]  # 公共的配置文件后缀
+    local_config_suffixes = [                          # 本地定制化配置文件后缀
+        ".local" + item for item in common_config_suffixes
+    ]
+    suffixes = [
+        suffix
+        for item in zip(common_config_suffixes, local_config_suffixes)
+        for suffix in item
+    ]
     return [
         _os.path.join(config_dir, f"dnspx{suffix}")
         for config_dir in _CONFIG_DIRS
