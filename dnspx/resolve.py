@@ -35,7 +35,7 @@ except ImportError:
 from cacheout import LRUCache as Cache
 
 from . import config
-from .utils import cached_property, thread_sync
+from .utils import cached_property, thread_sync, check_internet_socket
 from .error import DNSError, DNSTimeout, DNSUnreachableError, PluginExistsError
 
 
@@ -237,6 +237,18 @@ class DNSResolver(object):
                     servers.append(server)
         return servers
 
+    def check_nameservers(self, socket_type=socket.SOCK_DGRAM):
+        for server in self.nameservers:
+            ret = check_internet_socket(
+                server[0],
+                int(server[1]),
+                socket_type,
+                self.timeout,
+            )
+            if ret:
+                return ret
+        return False
+
     @staticmethod
     def _mount_plugin(target, name, plugin):
         if name in target:
@@ -308,6 +320,9 @@ class DNSResolver(object):
     def get_cache(self, name, qclass, qtype):
         key = self._get_cache_key(name, qclass, qtype)
         return self.query_cache.get(key)
+
+    def clear_cache(self):
+        self.query_cache.clear()
 
     @cached_property
     def _socks_proxies(self):
@@ -490,8 +505,8 @@ class ForeignResolverPlugin(object):
 
     def __init__(self, nameservers=None, timeout=3):
         self.nameservers = nameservers or [
-            ("8.8.8.8", 53)  # Google Public DNS
-            ("1.1.1.1", 53)  # CloudFlare DNS
+            ("8.8.8.8", 53),  # Google Public DNS
+            ("1.1.1.1", 53),  # CloudFlare DNS
         ]
         self.timeout = timeout
 

@@ -7,6 +7,7 @@ import functools
 import threading
 from collections import Counter
 from urllib.parse import urlparse
+from importlib import import_module
 
 try:
     import asyncio
@@ -88,3 +89,18 @@ def text_shorten(text, width=60, placeholder="..."):
 def parse_ip_port(netloc):
     parsed = urlparse(f'//{netloc}')
     return parsed.hostname, parsed.port
+
+
+def check_internet_socket(host="8.8.8.8", port=53, socket_type=None, timeout=3):
+    socket = import_module("socket")
+    if not socket_type:
+        socket_type = socket.SOCK_STREAM
+    try:
+        sock = socket.socket(socket.AF_INET, socket_type)
+        sock.settimeout(timeout)
+        sock.connect((host, port))
+    except socket.error:
+        return False
+    else:
+        sock.close()
+        return True

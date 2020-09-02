@@ -16,7 +16,7 @@ import dns.message
 from dns.message import Message as DNSMessage
 
 from . import config
-from .utils import cached_property
+from .utils import cached_property, thread_sync
 from .resolve import DNSResolver
 from .error import DNSTimeout, DNSUnreachableError
 
@@ -24,7 +24,9 @@ from .error import DNSTimeout, DNSUnreachableError
 log = logging.getLogger(__name__)
 
 
-class DNSHandler():
+class DNSHandler(object):
+
+    DETECTED_NETWORK_ANOMALY = False
 
     def parse(self, message):
         response = b''
@@ -56,6 +58,9 @@ class DNSHandler():
         except Exception as e:
             _log = log.exception
             if isinstance(e, (DNSTimeout, DNSUnreachableError)):
+                if not self.server.check_nameservers(self.server.socket_type):
+                    with thread_sync():
+                        self.__class__.DETECTED_NETWORK_ANOMALY = True
                 _log = log.warning
             _log(f"DNS query failed, question: {qmsg.question_str}, msg: {e}")
 
@@ -95,6 +100,20 @@ class BaseSocketServer(socketserver.ThreadingMixIn):
 
         self.dns_resolver = dns_resolver
         self.address_family = address_family
+
+        self.check_nameservers = dns_resolver.check_nameservers
+
+    def process_request(self, request, client_address):
+        if self.RequestHandlerClass.DETECTED_NETWORK_ANOMALY:
+            if not self.check_nameservers():
+                log.warning("Detected network anomaly, response to an empty data")
+                self.socket.sendto(b'', client_address)
+                return
+            else:
+                with thread_sync():
+                    self.RequestHandlerClass.DETECTED_NETWORK_ANOMALY = False
+                self.dns_resolver.clear_cache()
+        super().process_request(request, client_address)
 
 
 class ThreadedUDPServer(BaseSocketServer, socketserver.UDPServer):
