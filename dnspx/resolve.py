@@ -111,11 +111,20 @@ class _UDPQuery(object):
         return self.socket
 
     def compute_expiration(self):
-        return dns.query._compute_expiration(self.timeout)
+        if self.timeout is None:
+            return None
+        else:
+            return time.time() + self.timeout
+
+    def _wait_for_writable(self, sock, expiration):
+        try:
+            dns.query._wait_for_writable(sock, expiration)
+        except AttributeError as ex:
+            log.warning("Wait for writable error: %s", ex)
 
     def send_msg(self, expiration=None):
         sock = self.get_sock()
-        dns.query._wait_for_writable(sock, expiration)
+        self._wait_for_writable(sock, expiration)
         sent_time = time.time()
         length = sock.sendall(self.qdata)
         return length, sent_time
