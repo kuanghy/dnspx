@@ -322,9 +322,12 @@ class DNSResolver(object):
     def _get_cache_key(qname, qclass, qtype):
         return f"{qname}_{qclass}_{qtype}"
 
+    def _get_cache_ttl(self):
+        return config.DNS_CACHE_TTL + round(random.uniform(1, 6), 2)
+
     def set_cache(self, name, qclass, qtype, amsg):
         key = self._get_cache_key(name, qclass, qtype)
-        self.query_cache.set(key, amsg)
+        self.query_cache.set(key, amsg, ttl=self._get_cache_ttl())
 
     def get_cache(self, name, qclass, qtype):
         key = self._get_cache_key(name, qclass, qtype)
