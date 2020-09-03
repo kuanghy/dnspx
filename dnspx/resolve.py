@@ -200,8 +200,8 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
                 _log = log.warning
             _log(f"Proxy query failed, question: {question_str}, msg: {e}")
         else:
-            log.debug(f"Proxy query successful, question: {question_str}, "
-                      f"take {(response_time * 1000):.2f} msec")
+            log.info(f"Proxy query successful, question: {question_str}, "
+                     f"take {(response_time * 1000):.2f} msec")
             break
     else:
         raise DNSUnreachableError("no servers could be reached")
