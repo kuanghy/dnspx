@@ -1,7 +1,7 @@
 DNS 服务压力测试
 ===============
 
-DNSPerf（DNS Performance）工具可用于测试 DNS 服务器的性能。
+[DNSPerf（DNS Performance）](https://github.com/cobblau/dnsperf) 工具可用于测试 DNS 服务器的性能。
 
 测试示例：
 
