@@ -91,6 +91,9 @@ FOREIGN_PROXY_SERVERS = None
 # 服务器运行的进程优先级，值为 -20 到 19，仅 Unix 环境有效
 PROCESS_PRIORITY = 0
 
+# 最多允许同时有多少个线程处理请求（默认为 CPU 核数的 3 倍）
+MAX_THREAD_NUM = _os.cpu_count() * 3
+
 # 开启邮件报告功能，以通过邮件报告运行错误或者运行结果
 ENABLE_MAIL_REPORT = False
 

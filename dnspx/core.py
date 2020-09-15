@@ -104,6 +104,12 @@ class BaseSocketServer(socketserver.ThreadingMixIn):
         self.check_nameservers = dns_resolver.check_nameservers
 
     def process_request(self, request, client_address):
+        thread_count = threading.active_count()
+        if config.MAX_THREAD_NUM > 0 and thread_count > config.MAX_THREAD_NUM:
+            log.warning("Too many threads, current number of threads: %s",
+                        thread_count)
+            self.socket.sendto(b'', client_address)
+            return
         if self.RequestHandlerClass.DETECTED_NETWORK_ANOMALY:
             if not self.check_nameservers():
                 log.warning("Detected network anomaly, response to an empty data")
