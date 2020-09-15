@@ -3,7 +3,7 @@
 # Copyright (c) Huoty, All rights reserved
 # Author: Huoty <sudohuoty@163.com>
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 
 _VersionInfo = __import__("collections").namedtuple(
