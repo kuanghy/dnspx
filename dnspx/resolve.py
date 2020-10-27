@@ -184,13 +184,19 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
     qsocket_type = qmsg.qsocket_type
     for nameserver in nameservers:
         host, port, *_ = nameserver
+        is_foreign_nameserver = (nameserver.type == "foreign")
         question_str = f"@{host}:{port} {qmsg.id} {qmsg.question_str}"
         Query = _UDPQuery if qsocket_type == socket.SOCK_DGRAM else _TCPQuery
+        _timeout = (
+            config.FOREIGN_QUERY_TIMEOUT  # 海外 DNS 速度较慢，超时可设长一点
+            if is_foreign_nameserver and config.FOREIGN_QUERY_TIMEOUT > 0
+            else timeout
+        )
         query = Query(
             qmsg, nameserver,
             proxyserver=proxyserver,
             socket_family=qmsg.qsocket_family,
-            timeout=timeout
+            timeout=_timeout
         )
         try:
             amsg, response_time = query()

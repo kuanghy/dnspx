@@ -30,6 +30,7 @@ NAMESERVERS = [
     ("1.2.4.8", "53", "inland", "CNNIC sDNS"),
     ("117.50.11.11", "53", "inland", "OneDNS 拦截版"),
     ("117.50.10.10", "53", "inland", "OneDNS 纯净版"),
+
     ("1.1.1.1", "53", "foreign", "CloudFlare DNS，号称全球最快的 DNS 服务"),
     ("8.8.8.8", "53", "foreign", "Google Public DNS"),
     ("208.67.222.222", "53", "foreign", "OpenDNS"),
@@ -39,14 +40,18 @@ NAMESERVERS = [
     ("84.200.69.80", "53", "foreign", "DNS.WATCH"),
     ("1.0.0.1", "53", "foreign", "CloudFlare DNS 备用地址"),
     ("8.8.4.4", "53", "foreign", "Google Public DNS 备用地址"),
+
     "223.6.6.6",  # Public DNS+ 备用地址
     "114.114.115.115",  # 114DNS 备用地址
     "114.114.114.119",  # 114DNS 拦截钓鱼病毒木马网站
     "114.114.114.110",  # 114DNS 拦截色情网站
 ]
 
-# 往上游服务器查询的超时时间，单位为秒
+# 往上游 DNS 服务器查询时的默认超时时间，单位为秒
 QUERY_TIMEOUT = 2
+# 往海外 DNS 服务器查询的超时时间，单位为秒
+# 该值大于 0 时，所有向海外 DNS 服务器的查询都会使用此超时时间
+FOREIGN_QUERY_TIMEOUT = 0
 
 # 开启 DNS 缓存
 ENABLE_DNS_CACHE = True
