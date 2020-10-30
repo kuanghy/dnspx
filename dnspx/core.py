@@ -143,8 +143,12 @@ class DNSProxyServer(object):
         self.hosts_path = hosts_path
         self.enable_tcp = enable_tcp
         self.enable_ipv6 = enable_ipv6
+
         self._udp_server = None
         self._tcp_server = None
+
+        self._udp_server_thread = None
+        self._tcp_server_thread = None
 
     @property
     def socket_family(self):
@@ -205,7 +209,11 @@ class DNSProxyServer(object):
             self.dns_resolver,
             self.socket_family,
         )
-        threading.Thread(target=self._udp_server.serve_forever).start()
+        self._udp_server_thread = threading.Thread(
+            target=self._udp_server.serve_forever
+        )
+        self._udp_server_thread.daemon = True
+        self._udp_server_thread.start()
         if self.enable_tcp:
             log.info("DNSPX tcp server is enabled")
             self._tcp_server = ThreadedTCPServer(
@@ -214,7 +222,11 @@ class DNSProxyServer(object):
                 self.dns_resolver,
                 self.socket_family
             )
-            threading.Thread(target=self._tcp_server.serve_forever).start()
+            self._tcp_server_thread = threading.Thread(
+                 target=self._tcp_server.serve_forever
+            )
+            self._tcp_server_thread.daemon = True
+            self._tcp_server_thread.start()
         log.info("DNSPX server started on address '%s:%s'",
                  *self.server_address)
 
