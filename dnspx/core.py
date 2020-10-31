@@ -16,7 +16,7 @@ import dns.message
 from dns.message import Message as DNSMessage
 
 from . import config
-from .utils import cached_property, thread_sync
+from .utils import cached_property, suppress, thread_sync
 from .resolve import DNSResolver
 from .error import DNSTimeout, DNSUnreachableError
 
@@ -230,9 +230,13 @@ class DNSProxyServer(object):
         log.info("DNSPX server started on address '%s:%s'",
                  *self.server_address)
 
+        nap_seconds = 60 * 10
         try:
             while True:
-                time.sleep(60)
+                time.sleep(nap_seconds)
+                with suppress(Exception, logger=log, loglevel="warning"):
+                    self.dns_resolver.evict_cache()
+                    __import__("gc").collect()
         except SystemExit as e:
             log.warning(e)
         log.info("DNSPX server is shutting down")

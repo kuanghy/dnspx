@@ -82,6 +82,27 @@ class thread_sync(object):
         return wrapper
 
 
+class suppress(object):
+
+    def __init__(self, *exceptions, **kwargs):
+        self.exceptions = exceptions
+        self.logger = kwargs.get("logger") or kwargs.get("log")
+        self.loglevel = kwargs.get("loglevel", "exception")
+
+        self._log = (getattr(self.logger, self.loglevel, None)
+                     if self.logger else None)
+
+    def __enter__(self):
+        return
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not exc_type or not issubclass(exc_type, self.exceptions):
+            return
+        if exc_val and self._log:
+            self._log(exc_val)
+        return True
+
+
 def text_shorten(text, width=60, placeholder="..."):
     return text[:width] + (text[width:] and placeholder)
 

@@ -322,6 +322,7 @@ class DNSResolver(object):
 
     @cached_property
     def query_cache(self):
+        # 这里使用的 Cache 本身是线程安全的，操作时不必再加锁
         return Cache(maxsize=config.DNS_CACHE_SIZE, ttl=config.DNS_CACHE_TTL)
 
     @staticmethod
@@ -340,7 +341,10 @@ class DNSResolver(object):
         return self.query_cache.get(key)
 
     def clear_cache(self):
-        self.query_cache.clear()
+        return self.query_cache.clear()
+
+    def evict_cache(self):
+        return self.query_cache.evict()
 
     @cached_property
     def _socks_proxies(self):
