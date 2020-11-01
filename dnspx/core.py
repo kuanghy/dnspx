@@ -46,23 +46,22 @@ class DNSHandler(object):
             qmsg.question_str = " & ".join(str(q) for q in qmsg.question)
             qmsg.qtype = question.rdtype
             qmsg.qclass = question.rdclass
-        except Exception:
-            log.error(f"{client} query error: invalid DNS request")
+        except Exception as ex:
+            log.error(f"Invalid DNS request from {client}, msg: {ex}")
             return response
 
-        log.info(f"Query from {client}, question: {qmsg.id} "
-                 f"{qmsg.question_str}")
+        log.info(f"From {client} [{qmsg.id} {qmsg.question_str}]")
         try:
             amsg = self.server.dns_resolver.query(qmsg)
             response = amsg.to_wire() if isinstance(amsg, DNSMessage) else amsg
-        except Exception as e:
+        except Exception as ex:
             _log = log.exception
-            if isinstance(e, (DNSTimeout, DNSUnreachableError)):
+            if isinstance(ex, (DNSTimeout, DNSUnreachableError)):
                 if not self.server.check_nameservers(self.server.socket_type):
                     with thread_sync():
                         self.__class__.DETECTED_NETWORK_ANOMALY = True
                 _log = log.warning
-            _log(f"DNS query failed, question: {qmsg.question_str}, msg: {e}")
+            _log(f"DNS query failed, question: {qmsg.question_str}, msg: {ex}")
 
         return response
 
@@ -237,6 +236,6 @@ class DNSProxyServer(object):
                 with suppress(Exception, logger=log, loglevel="warning"):
                     self.dns_resolver.evict_cache()
                     __import__("gc").collect()
-        except SystemExit as e:
-            log.warning(e)
+        except SystemExit as ex:
+            log.warning(ex)
         log.info("DNSPX server is shutting down")

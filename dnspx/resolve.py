@@ -185,7 +185,6 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
     for nameserver in nameservers:
         host, port, *_ = nameserver
         is_foreign_nameserver = (nameserver.type == "foreign")
-        question_str = f"@{host}:{port} {qmsg.id} {qmsg.question_str}"
         Query = _UDPQuery if qsocket_type == socket.SOCK_DGRAM else _TCPQuery
         _timeout = (
             config.FOREIGN_QUERY_TIMEOUT  # 海外 DNS 速度较慢，超时可设长一点
@@ -200,14 +199,15 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
         )
         try:
             amsg, response_time = query()
-        except Exception as e:
+        except Exception as ex:
             _log = log.exception
-            if isinstance(e, (OSError, DNSTimeout, BadDNSResponse)):
+            if isinstance(ex, (OSError, DNSTimeout, BadDNSResponse)):
                 _log = log.warning
-            _log(f"Proxy query failed, question: {question_str}, msg: {e}")
+            question_str = f"@{host}:{port} {qmsg.id} {qmsg.question_str}"
+            _log(f"Proxy query failed, question: {question_str}, msg: {ex}")
         else:
-            log.info(f"Proxy query successful, question: {question_str}, "
-                     f"take {(response_time * 1000):.2f} msec")
+            log.info(f"Proxy to {host}:{port} [{qmsg.id} {qmsg.question_str}] "
+                     f"{(response_time * 1000):.2f} msec")
             break
     else:
         raise DNSUnreachableError("no servers could be reached")
@@ -393,7 +393,7 @@ class DNSResolver(object):
             if enable_dns_cache:
                 data = self.get_cache(name, qclass, qtype)
                 if data:
-                    log.debug(f"Query '{question_str}' cache is valid, use it")
+                    log.debug(f"Query [{question_str}] cache is valid, use it")
                     data.id = qmsg.id
                     return data
             if qtype in {QTYPE_A,  QTYPE_AAAA}:
