@@ -28,6 +28,4 @@ taobao.com A
 参数 -s 表示指定 DNS 服务器地址，还有 -p 参数可用于指定 DNS 服务器的端口
 
 
-
-
 *Copyright (c) Huoty, 2020.06.22*
