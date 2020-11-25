@@ -15,6 +15,12 @@ CURRDIR = path_dirname(__file__)
 
 EXCLUDE_FROM_PACKAGES = ["tests"]
 
+DESCRIPTION = "DNS proxy query service tool"
+LONG_DESCRIPTION = """
+**dnspx** is a DNS proxy query service tool. It provides a lightweight
+local DNS server, to accelerate the DNS, avoid pollution of DNS, and so on.
+"""
+
 setup_args = dict(
     name='dnspx',
     version='0.0.1',
@@ -23,7 +29,8 @@ setup_args = dict(
     author_email='sudohuoty@163.com',
     maintainer="Huoty",
     maintainer_email="sudohuoty@163.com",
-    description='DNS proxy query tool',
+    description=DESCRIPTION,
+    long_description=LONG_DESCRIPTION,
     url='https://github.com/kuanghy/dnspx',
     keywords=["dns", "dnsproxy", "dnspx", "ns"],
     zip_safe=False,
@@ -42,7 +49,7 @@ setup_args = dict(
         'Intended Audience :: Developers',
         'Intended Audience :: System Administrators',
         'Topic :: Internet :: Name Service (DNS)',
-        'Topic :: System :: Networking'
+        'Topic :: System :: Networking',
         'License :: OSI Approved :: Apache Software License',
     ],
 )
