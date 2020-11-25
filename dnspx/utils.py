@@ -113,7 +113,7 @@ def parse_ip_port(netloc):
     return parsed.hostname, parsed.port
 
 
-def is_tty(self):
+def is_tty():
     isatty = getattr(sys.stdout, 'isatty', None)
     return bool(isatty and isatty())
 

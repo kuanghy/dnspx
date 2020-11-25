@@ -17,7 +17,7 @@ import dns.message
 from dns.message import Message as DNSMessage
 
 from . import config
-from .utils import cached_property, suppress, thread_sync
+from .utils import cached_property, suppress, thread_sync, is_tty
 from .resolve import DNSResolver
 from .error import DNSTimeout, DNSUnreachableError
 
@@ -200,6 +200,8 @@ class DNSProxyServer(object):
         signal.signal(signal.SIGTERM, handle_signal)
 
     def set_proctitle(self):
+        if is_tty():
+            return
         try:
             spt = import_module("setproctitle")
         except ImportError as ex:
