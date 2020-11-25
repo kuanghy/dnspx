@@ -11,6 +11,7 @@ import logging
 import binascii
 import threading
 import socketserver
+from importlib import import_module
 
 import dns.message
 from dns.message import Message as DNSMessage
@@ -198,6 +199,17 @@ class DNSProxyServer(object):
         signal.signal(signal.SIGINT, handle_signal)
         signal.signal(signal.SIGTERM, handle_signal)
 
+    def set_proctitle(self):
+        try:
+            spt = import_module("setproctitle")
+        except ImportError as ex:
+            log.debug(f"{ex}")
+            return
+        try:
+            spt.setproctitle(config.PROCESS_TITLE)
+        except Exception as ex:
+            log.debug(f"Set process title error: {ex}")
+
     def run(self):
         self.set_priority()
         self.register_signal_handler()
@@ -228,6 +240,7 @@ class DNSProxyServer(object):
             self._tcp_server_thread.start()
         log.info("DNSPX server started on address '%s:%s'",
                  *self.server_address)
+        self.set_proctitle()
 
         nap_seconds = 60 * 10
         try:

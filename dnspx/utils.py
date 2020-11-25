@@ -3,6 +3,7 @@
 # Copyright (c) Huoty, All rights reserved
 # Author: Huoty <sudohuoty@163.com>
 
+import sys
 import functools
 import threading
 from collections import Counter
@@ -110,6 +111,11 @@ def text_shorten(text, width=60, placeholder="..."):
 def parse_ip_port(netloc):
     parsed = urlparse(f'//{netloc}')
     return parsed.hostname, parsed.port
+
+
+def is_tty(self):
+    isatty = getattr(sys.stdout, 'isatty', None)
+    return bool(isatty and isatty())
 
 
 def check_internet_socket(host="8.8.8.8", port=53, socket_type=None, timeout=3):
