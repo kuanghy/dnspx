@@ -63,7 +63,7 @@ ENABLE_SYSTEM_RESOLVER = True
 
 # 开启本地 hosts 文件支持
 ENABLE_LOCAL_HOSTS = True
-LOCAL_HOSTS_PATH = None  # 可以为目录或者文件
+LOCAL_HOSTS_PATH = None  # 本地 hosts 文件路径，可以为目录或者单个文件
 
 # 开启海外域名用海外 DNS 解析功能
 ENABLE_FOREIGN_RESOLVER = True
