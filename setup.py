@@ -25,16 +25,25 @@ setup_args = dict(
     maintainer_email="sudohuoty@163.com",
     description='DNS proxy query tool',
     url='https://github.com/kuanghy/dnspx',
-    keywords=["dns", "proxy"],
+    keywords=["dns", "dnsproxy", "dnspx", "ns"],
     zip_safe=False,
     license='Apache License v2',
     python_requires='>=3.6',
+    platforms=["any"],
     classifiers=[
+        'Development Status :: 4 - Beta',
+        'Environment :: Console',
+        'Operating System :: OS Independent',
         'Programming Language :: Python',
-        'Operating System :: Microsoft :: Windows',
-        'Operating System :: Unix',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Intended Audience :: Developers',
+        'Intended Audience :: System Administrators',
+        'Topic :: Internet :: Name Service (DNS)',
+        'Topic :: System :: Networking'
+        'License :: OSI Approved :: Apache Software License',
     ],
 )
 
