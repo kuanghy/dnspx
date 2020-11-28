@@ -91,7 +91,7 @@ class _UDPQuery(object):
     def make_socket(self):
         if self.proxyserver and pysocks:
             sock = pysocks.socksocket(self.socket_family, self.socket_type, 0)
-            sock.set_proxy(
+            proxy_params = dict(
                 proxy_type=getattr(pysocks, self.proxyserver.scheme.upper()),
                 addr=self.proxyserver.hostname,
                 port=self.proxyserver.port,
@@ -99,6 +99,7 @@ class _UDPQuery(object):
                 username=self.proxyserver.username,
                 password=self.proxyserver.password,
             )
+            sock.set_proxy(**proxy_params)
         else:
             sock = socket.socket(self.socket_family, self.socket_type, 0)
         sock.settimeout(self.timeout)

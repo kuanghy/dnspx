@@ -69,7 +69,10 @@ def main(args=None):
     loglevel = args.loglevel or config.LOGLEVEL
     logging.getLogger().setLevel(getattr(logging, loglevel.upper()))
 
-    server_address = parse_ip_port(args.listen or config.SERVER_LISTEN)
+    ip, port = parse_ip_port(args.listen or config.SERVER_LISTEN)
+    if port is None:
+        port = 53
+    server_address = (ip, port)
     if args.nameserver:
         nameservers = []
         for server in args.nameserver.split(","):

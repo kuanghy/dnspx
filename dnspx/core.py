@@ -183,8 +183,12 @@ class DNSProxyServer(object):
             priority = 19
         if priority < -20:
             priority = -20
-        os.setpriority(os.PRIO_PROCESS, 0, priority)
-        log.info(f"Set process priority to {priority}")
+        try:
+            os.setpriority(os.PRIO_PROCESS, 0, priority)
+        except Exception as ex:
+            log.warning(f"Set process priority error: {ex}")
+        else:
+            log.info(f"Set process priority to {priority}")
 
     def register_signal_handler(self):
 
