@@ -74,6 +74,8 @@ FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
     "python.org",
     "bitbucket.org",
     "gnome-look.org",
+    "googleapis.com",
+    "gitbook.com",
 
     # "sina.com",  # 部分匹配，匹配 sina.com、sina.com.cn、www.sina.com 等
     # "full:google.com",  # 完全匹配，仅匹配 google.com

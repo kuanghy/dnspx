@@ -35,6 +35,8 @@ foreign_domains:
     - "python.org"
     - "bitbucket.org"
     - "gnome-look.org"
+    - "googleapis.com"
+    - "gitbook.com"
 
 # 服务监听地址
 server_listen: "127.0.0.1:53"
