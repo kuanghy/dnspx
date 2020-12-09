@@ -222,10 +222,6 @@ class DNSResolver(object):
         self._nameservers = nameservers or []
         self.timeout = timeout
 
-    @cached_property
-    def _sys_resolver(self):
-        return SystemDNSResolver()
-
     @thread_sync()
     def _fetch_nameservers(self):
         servers = []
@@ -358,28 +354,6 @@ class DNSResolver(object):
             random.choice(self._socks_proxies) if self._socks_proxies else None
         )
 
-    def _proxy_query(self, qmsg):
-        if self.nameservers:
-            try:
-                return proxy_dns_query(
-                    qmsg, self.nameservers,
-                    proxyserver=self.proxyserver,
-                    timeout=self.timeout
-                )
-            except DNSUnreachableError:
-                if not config.ENABLE_SYSTEM_RESOLVER:
-                    raise
-
-        if not config.ENABLE_SYSTEM_RESOLVER:
-            raise DNSError("No name servers")
-
-        return self._sys_resolver.query(
-            qmsg.qname,
-            rdtype=qmsg.qtype,
-            rdclass=dns.rdataclass.IN,
-            tcp=(qmsg.qsocket_type == "tcp")
-        ).response
-
     def query(self, qmsg):
         name = qmsg.qname_str
         qclass = qmsg.qclass
@@ -406,7 +380,11 @@ class DNSResolver(object):
                 elif isinstance(ret, bytes):
                     return ret
 
-        amsg = self._proxy_query(qmsg)
+        amsg = proxy_dns_query(
+            qmsg, self.nameservers,
+            proxyserver=self.proxyserver,
+            timeout=self.timeout
+        )
         if (enable_dns_cache and not is_multi_question and is_query_op and
                 isinstance(amsg, DNSMessage)):
             self.set_cache(name, qclass, qtype, amsg)

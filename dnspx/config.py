@@ -58,9 +58,6 @@ ENABLE_DNS_CACHE = True
 DNS_CACHE_SIZE = 256
 DNS_CACHE_TTL = 60 * 60 * 3  # 默认为 3 小时
 
-# 是否在没有配置 DNS 服务器，或者配置的 DNS 服务器都不可达时，使用系统 DNS 解析器
-ENABLE_SYSTEM_RESOLVER = True
-
 # 开启本地 hosts 文件支持
 ENABLE_LOCAL_HOSTS = True
 LOCAL_HOSTS_PATH = None  # 本地 hosts 文件路径，可以为目录或者单个文件
