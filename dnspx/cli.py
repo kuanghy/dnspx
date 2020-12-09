@@ -73,13 +73,7 @@ def main(args=None):
     if port is None:
         port = 53
     server_address = (ip, port)
-    if args.nameserver:
-        nameservers = []
-        for server in args.nameserver.split(","):
-            ip, port = parse_ip_port(server)
-            nameservers.append((ip, port or 53))
-    else:
-        nameservers = None
+    nameservers = args.nameserver.split(",") if args.nameserver else None
     server = DNSProxyServer(
         server_address,
         nameservers=nameservers,

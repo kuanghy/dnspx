@@ -23,23 +23,23 @@ USER_HOME = _os.getenv("HOME", "/home/server")
 # 除 IP地址 外，其他项为非必须项，不指定时取默认值，端口为 53，属性 inland，说明为 None
 # DNS 配置也可以为一个仅包含 ip 的字符串
 NAMESERVERS = [
-    ("119.29.29.29", "53", "inland", "Public DNS+，腾讯云旗下的公共 DNS 服务"),
-    ("223.5.5.5", "53", "inland", "AliDNS 阿里公共 DNS"),
-    ("114.114.114.114", "53", "inland", "国内电信运营商自用的 DNS 服务"),
-    ("180.76.76.76", "53", "inland", "百度 BaiduDNS"),
-    ("1.2.4.8", "53", "inland", "CNNIC sDNS"),
-    ("117.50.11.11", "53", "inland", "OneDNS 拦截版"),
-    ("117.50.10.10", "53", "inland", "OneDNS 纯净版"),
+    ("119.29.29.29", "inland", "Public DNS+，腾讯云旗下的公共 DNS 服务"),
+    ("223.5.5.5", "inland", "AliDNS 阿里公共 DNS"),
+    ("114.114.114.114", "inland", "国内电信运营商自用的 DNS 服务"),
+    ("180.76.76.76", "inland", "百度 BaiduDNS"),
+    ("1.2.4.8", "inland", "CNNIC sDNS"),
+    ("117.50.11.11", "inland", "OneDNS 拦截版"),
+    ("117.50.10.10", "inland", "OneDNS 纯净版"),
 
-    ("1.1.1.1", "53", "foreign", "CloudFlare DNS，号称全球最快的 DNS 服务"),
-    ("8.8.8.8", "53", "foreign", "Google Public DNS"),
-    ("208.67.222.222", "53", "foreign", "OpenDNS"),
-    ("199.85.126.30", "53", "foreign", "Norton ConnectSafe DNS C"),
-    ("199.85.126.20", "53", "foreign", "Norton ConnectSafe DNS B"),
-    ("199.85.126.10", "53", "foreign", "Norton ConnectSafe DNS A"),
-    ("84.200.69.80", "53", "foreign", "DNS.WATCH"),
-    ("1.0.0.1", "53", "foreign", "CloudFlare DNS 备用地址"),
-    ("8.8.4.4", "53", "foreign", "Google Public DNS 备用地址"),
+    ("1.1.1.1", "foreign", "CloudFlare DNS，号称全球最快的 DNS 服务"),
+    ("8.8.8.8", "foreign", "Google Public DNS"),
+    ("208.67.222.222", "foreign", "OpenDNS"),
+    ("199.85.126.30", "foreign", "Norton ConnectSafe DNS C"),
+    ("199.85.126.20", "foreign", "Norton ConnectSafe DNS B"),
+    ("199.85.126.10", "foreign", "Norton ConnectSafe DNS A"),
+    ("84.200.69.80", "foreign", "DNS.WATCH"),
+    ("1.0.0.1", "foreign", "CloudFlare DNS 备用地址"),
+    ("8.8.4.4", "foreign", "Google Public DNS 备用地址"),
 
     "223.6.6.6",  # Public DNS+ 备用地址
     "114.114.115.115",  # 114DNS 备用地址

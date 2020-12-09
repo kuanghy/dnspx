@@ -35,12 +35,25 @@ except ImportError:
 from cacheout import LRUCache as Cache
 
 from . import config
-from .utils import cached_property, thread_sync, check_internet_socket
-from .error import DNSError, DNSTimeout, DNSUnreachableError, PluginExistsError
+from .utils import (
+    cached_property,
+    thread_sync,
+    check_internet_socket,
+    parse_ip_port,
+)
+from .error import (
+    DNSError,
+    DNSTimeout,
+    DNSUnreachableError,
+    PluginExistsError,
+)
 
 
 QTYPE_A = dns.rdatatype.A
 QTYPE_AAAA = dns.rdatatype.AAAA
+
+NameServer = namedtuple("NameServer", ("address", "type", "comment"))
+NameServer.__new__.__defaults__ = ("", "inland", None)
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +69,13 @@ class _UDPQuery(object):
         self.timeout = timeout
         self.socket = None
         self.adata = b''
+
+    @cached_property
+    def address():
+        ip, port = parse_ip_port(self.nameserver)
+        if port is None:
+            port = 53
+        return ip, port
 
     @cached_property
     def socket_type(self):
@@ -103,8 +123,7 @@ class _UDPQuery(object):
         else:
             sock = socket.socket(self.socket_family, self.socket_type, 0)
         sock.settimeout(self.timeout)
-        address = self.nameserver[:2]
-        sock.connect(address)
+        sock.connect(self.address)
         self.socket = sock
         return sock
 
@@ -178,37 +197,47 @@ class _TCPQuery(_UDPQuery):
         return self._convert_message(self.adata[2:])
 
 
+class _HTTPQuery(object):
+
+    def __init__(self):
+        pass
+
+
 def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
     if proxyserver:
         log.debug(f"Use proxy '{proxyserver.geturl()}' for question "
                   f"'{qmsg.question_str}'")
     qsocket_type = qmsg.qsocket_type
     for nameserver in nameservers:
-        host, port, *_ = nameserver
         is_foreign_nameserver = (nameserver.type == "foreign")
-        Query = _UDPQuery if qsocket_type == socket.SOCK_DGRAM else _TCPQuery
         _timeout = (
             config.FOREIGN_QUERY_TIMEOUT  # 海外 DNS 速度较慢，超时可设长一点
             if is_foreign_nameserver and config.FOREIGN_QUERY_TIMEOUT > 0
             else timeout
         )
-        query = Query(
-            qmsg, nameserver,
-            proxyserver=proxyserver,
-            socket_family=qmsg.qsocket_family,
-            timeout=_timeout
-        )
+        if nameserver.address.startswith("http"):
+            query = _HTTPQuery()
+        else:
+            Query = (_UDPQuery if qsocket_type == socket.SOCK_DGRAM
+                     else _TCPQuery)
+            query = Query(
+                qmsg, nameserver,
+                proxyserver=proxyserver,
+                socket_family=qmsg.qsocket_family,
+                timeout=_timeout
+            )
         try:
             amsg, response_time = query()
         except Exception as ex:
             _log = log.exception
             if isinstance(ex, (OSError, DNSTimeout, BadDNSResponse)):
                 _log = log.warning
-            question_str = f"@{host}:{port} {qmsg.id} {qmsg.question_str}"
-            _log(f"Proxy query failed, question: {question_str}, msg: {ex}")
+            _log(f"Proxy query failed, question: @{nameserver.address} "
+                 f"{qmsg.id} {qmsg.question_str}, msg: {ex}")
         else:
-            log.info(f"Proxy to {host}:{port} [{qmsg.id} {qmsg.question_str}] "
-                     f"{(response_time * 1000):.2f} msec")
+            log.info(f"Proxy to {nameserver.address} [{qmsg.id} "
+                     f"{qmsg.question_str}] {(response_time * 1000):.2f} "
+                     "msec")
             break
     else:
         raise DNSUnreachableError("no servers could be reached")
@@ -224,15 +253,10 @@ class DNSResolver(object):
 
     @thread_sync()
     def _fetch_nameservers(self):
-        servers = []
-        NameServer = namedtuple("NameServer", ("ip", "port", "type", "comment"))
-        NameServer.__new__.__defaults__ = (None, 53, "inland", None)
-        for server in self._nameservers + (config.NAMESERVERS or []):
-            if not isinstance(server, (tuple, list)):
-                server = (server, 53)
-            server = NameServer(*server)
-            server = server._replace(port=int(server.port))
-            servers.append(server)
+        servers = [
+            NameServer(*server[:3])
+            for server in self._nameservers + (config.NAMESERVERS or [])
+        ]
         return servers
 
     @cached_property
