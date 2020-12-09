@@ -33,6 +33,15 @@ class cached_property(object):
         return value
 
 
+class classproperty(object):
+
+    def __init__(self, func):
+        self.func = classmethod(func)
+
+    def __get__(self, instance, owner):
+        return self.func.__get__(instance, owner)()
+
+
 class thread_sync(object):
 
     mutex = threading.RLock()

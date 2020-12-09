@@ -11,6 +11,7 @@ import socket
 import struct
 import logging
 import ipaddress
+from importlib import import_module
 from collections import namedtuple, OrderedDict
 from urllib.parse import urlparse
 
@@ -26,16 +27,12 @@ from dns.message import Message as DNSMessage, BadEDNS as BadEDNSMessage
 from dns.query import BadResponse as BadDNSResponse
 from dns.rdatatype import to_text as qtype2text
 
-try:
-    import socks as pysocks
-except ImportError:
-    pysocks = None
-
 from cacheout import LRUCache as Cache
 
 from . import config
 from .utils import (
     cached_property,
+    class_property,
     thread_sync,
     check_internet_socket,
     parse_ip_port,
@@ -107,7 +104,8 @@ class _UDPQuery(object):
         return self._convert_message(self.adata)
 
     def make_socket(self):
-        if self.proxyserver and pysocks:
+        if self.proxyserver:
+            pysocks = import_module("socks")
             sock = pysocks.socksocket(self.socket_family, self.socket_type, 0)
             proxy_params = dict(
                 proxy_type=getattr(pysocks, self.proxyserver.scheme.upper()),
@@ -197,7 +195,28 @@ class _TCPQuery(_UDPQuery):
 
 class _HTTPQuery(object):
 
-    def __init__(self):
+    def __init__(self, qmsg, nameserver, proxyserver=None, timeout=3):
+        self.qmsg = qmsg
+        self.nameserver = nameserver
+        self.proxyserver = proxyserver
+        self.timeout = timeout
+
+    @property
+    def url(self):
+        return self.nameserver.address
+
+    @classmethod
+    def get_session(cls, url):
+        if not hasattr(cls, "_session_pool"):
+            setattr(cls, "_session_pool", {})
+        hostname = urlparse(url).hostname
+        _session = cls._session_pool.get(hostname)
+        if not _session:
+            _session = import_module("requests").Session()
+            cls._session_pool[hostname] = _session
+        return hostname
+
+    def __call__(self):
         pass
 
 

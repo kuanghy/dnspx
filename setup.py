@@ -77,7 +77,8 @@ def main():
         "cacheout",
     ]
     setup_args["extras_require"] = {
-        "SOCKS": ["pysocks"]
+        "http": ["requests"],
+        "socks": ["pysocks"],
     }
     setup_args["entry_points"] = {
         'console_scripts': [
