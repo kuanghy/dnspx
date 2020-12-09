@@ -109,7 +109,8 @@ def text_shorten(text, width=60, placeholder="..."):
 
 
 def parse_ip_port(netloc):
-    parsed = urlparse(f'//{netloc}')
+    netloc = netloc if "//" in netloc else f'//{netloc}'
+    parsed = urlparse(netloc)
     return parsed.hostname, parsed.port
 
 

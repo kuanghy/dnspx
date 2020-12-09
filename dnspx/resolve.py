@@ -25,7 +25,6 @@ import dns.rdtypes.IN.AAAA
 from dns.message import Message as DNSMessage, BadEDNS as BadEDNSMessage
 from dns.query import BadResponse as BadDNSResponse
 from dns.rdatatype import to_text as qtype2text
-from dns.resolver import Resolver as SystemDNSResolver
 
 try:
     import socks as pysocks
@@ -42,7 +41,6 @@ from .utils import (
     parse_ip_port,
 )
 from .error import (
-    DNSError,
     DNSTimeout,
     DNSUnreachableError,
     PluginExistsError,
@@ -71,8 +69,8 @@ class _UDPQuery(object):
         self.adata = b''
 
     @cached_property
-    def address():
-        ip, port = parse_ip_port(self.nameserver)
+    def address(self):
+        ip, port = parse_ip_port(self.nameserver.address)
         if port is None:
             port = 53
         return ip, port
@@ -254,8 +252,9 @@ class DNSResolver(object):
     @thread_sync()
     def _fetch_nameservers(self):
         servers = [
-            NameServer(*server[:3])
-            for server in self._nameservers + (config.NAMESERVERS or [])
+            NameServer(
+                *(server[:3] if isinstance(server, (tuple, list)) else [server])
+            ) for server in self._nameservers + (config.NAMESERVERS or [])
         ]
         return servers
 
@@ -275,9 +274,10 @@ class DNSResolver(object):
 
     def check_nameservers(self, socket_type=socket.SOCK_DGRAM):
         for server in self.nameservers:
+            ip, port = parse_ip_port(server.address)
             ret = check_internet_socket(
-                server[0],
-                int(server[1]),
+                ip,
+                port or 53,
                 socket_type,
                 self.timeout,
             )
