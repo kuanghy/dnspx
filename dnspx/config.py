@@ -19,10 +19,12 @@ IS_UNIX = (IS_MACOSX or IS_LINUX)
 USER_HOME = _os.getenv("HOME", "/home/server")
 
 # 配置公共 DNS 服务器
-# 每一个 DNS 配置可以为一个 tuple，list，每一项包含：IP地址，端口，类型，说明
-# 除 IP地址 外，其他项为非必须项，不指定时取默认值，端口为 53，属性 inland，说明为 None
-# DNS 配置也可以为一个仅包含 ip 的字符串
-NAMESERVERS = [
+# 每一个 DNS 配置可以为一个 tuple，list，每一项包含：
+#     服务器地址，服务器类型，服务器说明
+# 除 服务器地址 外，其他项为非必须项，不指定时取默认值，类型 inland，说明为 None
+# 如果其类型主要用来标记是国内还是海外，包含两种类型：inland, foreign
+# 服务器端口默认为 53，也可以在地址中指定端口，如 127.0.0.1:50053
+NAMESERVERS = DEFAULT_NAMESERVERS = [
     ("119.29.29.29", "inland", "Public DNS+，腾讯云旗下的公共 DNS 服务"),
     ("223.5.5.5", "inland", "AliDNS 阿里公共 DNS"),
     ("114.114.114.114", "inland", "国内电信运营商自用的 DNS 服务"),

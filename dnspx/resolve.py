@@ -14,6 +14,7 @@ import ipaddress
 from importlib import import_module
 from collections import namedtuple, OrderedDict
 from urllib.parse import urlparse
+from urllib.request import urlopen, Request as HTTPRequest
 
 import dns.query
 import dns.message
@@ -32,10 +33,8 @@ from cacheout import LRUCache as Cache
 from . import config
 from .utils import (
     cached_property,
-    class_property,
     thread_sync,
     check_internet_socket,
-    parse_ip_port,
 )
 from .error import (
     DNSTimeout,
@@ -53,28 +52,61 @@ NameServer.__new__.__defaults__ = ("", "inland", None)
 log = logging.getLogger(__name__)
 
 
-class _UDPQuery(object):
+class NameServer(object):
 
-    def __init__(self, qmsg, nameserver, proxyserver=None,
-                 socket_family=socket.AF_INET, timeout=3):
-        self.qmsg = qmsg
-        self.nameserver = nameserver
-        self.proxyserver = proxyserver
-        self.socket_family = socket_family
-        self.timeout = timeout
-        self.socket = None
-        self.adata = b''
+    def __init__(self, address, type_="inland", comment=None):
+        self.raw_address = address
+        self.type_ = type_
+        self.comment = comment
+
+    @cached_property
+    def _pr_address(self):
+        return urlparse(
+            self.raw_address if "//" in self.raw_address
+            else f"//{self.raw_address}"
+        )
+
+    @cached_property
+    def is_doh(self):
+        # Check DNS over HTTP
+        return self._pr_address.scheme in ("http", "https")
+
+    @cached_property
+    def is_foreign(self):
+        return self.type_ == "foreign"
+
+    @cached_property
+    def host(self):
+        return self._pr_address.hostname
+
+    @cached_property
+    def port(self):
+        return self._pr_address.port if self._pr_address.port else (
+            80 if self.is_doh else 53
+        )
 
     @cached_property
     def address(self):
-        ip, port = parse_ip_port(self.nameserver.address)
-        if port is None:
-            port = 53
-        return ip, port
+        return self.host, self.port
 
-    @cached_property
-    def socket_type(self):
-        return socket.SOCK_DGRAM
+    def __repr__(self):
+        return "NameServer(address={}, type={}, comment={})".format(
+            self.raw_address, self.type_, self.comment
+        )
+
+    def __str__(self):
+        return str(self.raw_address)
+
+
+class _BaseQuery(object):
+
+    def __init__(self, qmsg, nameserver, proxyserver=None, timeout=3):
+        self.qmsg = qmsg
+        self.nameserver = nameserver
+        self.proxyserver = proxyserver
+        self.timeout = timeout
+
+        self.adata = b''
 
     @property
     def qdata(self):
@@ -85,7 +117,7 @@ class _UDPQuery(object):
         return data
 
     def _convert_message(self, wire):
-        # 转换报文数据包到 DNSMessage，如果转换失败则直接返回数据包
+        """转换报文数据包到 DNSMessage，如果转换失败则直接返回数据包"""
         try:
             msg = dns.message.from_wire(wire)
         except (BadEDNSMessage) as e:
@@ -102,6 +134,30 @@ class _UDPQuery(object):
     @property
     def amsg(self):
         return self._convert_message(self.adata)
+
+    def get(self):
+        return self.amsg
+
+    def __call__(self):
+        return self.amsg, 0  # (answer_message, response_time)
+
+
+class _UDPQuery(_BaseQuery):
+
+    def __init__(self, qmsg, nameserver, proxyserver=None,
+                 socket_family=socket.AF_INET, timeout=3):
+        super().__init__(qmsg, nameserver, proxyserver, timeout)
+
+        self.socket_family = socket_family
+        self.socket = None
+
+    @cached_property
+    def address(self):
+        return self.nameserver.address
+
+    @cached_property
+    def socket_type(self):
+        return socket.SOCK_DGRAM
 
     def make_socket(self):
         if self.proxyserver:
@@ -153,9 +209,6 @@ class _UDPQuery(object):
         self.adata += wire
         return wire, received_time
 
-    def get(self):
-        return self.amsg
-
     def __call__(self):
         self.make_socket()
         self.adata = b''
@@ -195,26 +248,15 @@ class _TCPQuery(_UDPQuery):
 
 class _HTTPQuery(object):
 
-    def __init__(self, qmsg, nameserver, proxyserver=None, timeout=3):
-        self.qmsg = qmsg
-        self.nameserver = nameserver
-        self.proxyserver = proxyserver
-        self.timeout = timeout
-
     @property
     def url(self):
-        return self.nameserver.address
+        return str(self.nameserver)
 
-    @classmethod
-    def get_session(cls, url):
-        if not hasattr(cls, "_session_pool"):
-            setattr(cls, "_session_pool", {})
-        hostname = urlparse(url).hostname
-        _session = cls._session_pool.get(hostname)
-        if not _session:
-            _session = import_module("requests").Session()
-            cls._session_pool[hostname] = _session
-        return hostname
+    def request(self):
+        headers = {
+            "Content-Type": "application/dns-message",
+        }
+        HTTPRequest(self.url, headers=None, method="POST")
 
     def __call__(self):
         pass
@@ -226,13 +268,12 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
                   f"'{qmsg.question_str}'")
     qsocket_type = qmsg.qsocket_type
     for nameserver in nameservers:
-        is_foreign_nameserver = (nameserver.type == "foreign")
         _timeout = (
             config.FOREIGN_QUERY_TIMEOUT  # 海外 DNS 速度较慢，超时可设长一点
-            if is_foreign_nameserver and config.FOREIGN_QUERY_TIMEOUT > 0
+            if nameserver.is_foreign and config.FOREIGN_QUERY_TIMEOUT > 0
             else timeout
         )
-        if nameserver.address.startswith("http"):
+        if nameserver.is_doh:
             query = _HTTPQuery()
         else:
             Query = (_UDPQuery if qsocket_type == socket.SOCK_DGRAM
@@ -249,12 +290,11 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
             _log = log.exception
             if isinstance(ex, (OSError, DNSTimeout, BadDNSResponse)):
                 _log = log.warning
-            _log(f"Proxy query failed, question: @{nameserver.address} "
+            _log(f"Proxy query failed, question: @{nameserver} "
                  f"{qmsg.id} {qmsg.question_str}, msg: {ex}")
         else:
-            log.info(f"Proxy to {nameserver.address} [{qmsg.id} "
-                     f"{qmsg.question_str}] {(response_time * 1000):.2f} "
-                     "msec")
+            log.info(f"Proxy to {nameserver} [{qmsg.id} {qmsg.question_str}] "
+                     f"{(response_time * 1000):.2f} msec")
             break
     else:
         raise DNSUnreachableError("no servers could be reached")
@@ -283,20 +323,19 @@ class DNSResolver(object):
 
     @cached_property
     def foreign_nameservers(self):
-        servers = []
-        all_nameservers = self.nameservers
         with thread_sync():
-            for server in all_nameservers:
-                if server.type == "foreign":
-                    servers.append(server)
+            servers = [
+                server for server in self.nameservers if server.is_foreign
+            ]
         return servers
 
     def check_nameservers(self, socket_type=socket.SOCK_DGRAM):
         for server in self.nameservers:
-            ip, port = parse_ip_port(server.address)
+            if server.is_doh:
+                continue
             ret = check_internet_socket(
-                ip,
-                port or 53,
+                server.host,
+                server.port,
                 socket_type,
                 self.timeout,
             )
