@@ -243,7 +243,7 @@ class _TCPQuery(_UDPQuery):
         return self._convert_message(self.adata[2:])
 
 
-class _HTTPQuery(object):
+class _HTTPQuery(_BaseQuery):
 
     @property
     def url(self):
@@ -253,10 +253,30 @@ class _HTTPQuery(object):
         headers = {
             "Content-Type": "application/dns-message",
         }
-        HTTPRequest(self.url, headers=None, method="POST")
+        req = HTTPRequest(
+            self.url,
+            data=self.qdata,
+            headers=None,
+            method="POST"
+        )
+        with urlopen(req) as resp:
+            if resp.status != 200:
+                raise
+            self.adata = resp.read()
+        return self.adata
 
     def __call__(self):
-        pass
+        start_time = time.time()
+        self.request()
+        end_time = time.time()
+        response_time = end_time - start_time
+        amsg = self.amsg
+        if isinstance(amsg, DNSMessage):
+            amsg.time = response_time
+            if (isinstance(self.qmsg, DNSMessage) and
+                    not self.qmsg.is_response(amsg)):
+                raise BadDNSResponse
+        return amsg, response_time
 
 
 def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
@@ -265,13 +285,19 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
                   f"'{qmsg.question_str}'")
     qsocket_type = qmsg.qsocket_type
     for nameserver in nameservers:
+        if qmsg.qname_str == nameserver.host:
+            continue
         _timeout = (
             config.FOREIGN_QUERY_TIMEOUT  # 海外 DNS 速度较慢，超时可设长一点
             if nameserver.is_foreign and config.FOREIGN_QUERY_TIMEOUT > 0
             else timeout
         )
         if nameserver.is_doh:
-            query = _HTTPQuery()
+            query = _HTTPQuery(
+                qmsg, nameserver,
+                proxyserver=proxyserver,
+                timeout=_timeout
+            )
         else:
             Query = (_UDPQuery if qsocket_type == socket.SOCK_DGRAM
                      else _TCPQuery)
