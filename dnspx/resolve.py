@@ -46,9 +46,6 @@ from .error import (
 QTYPE_A = dns.rdatatype.A
 QTYPE_AAAA = dns.rdatatype.AAAA
 
-NameServer = namedtuple("NameServer", ("address", "type", "comment"))
-NameServer.__new__.__defaults__ = ("", "inland", None)
-
 log = logging.getLogger(__name__)
 
 
