@@ -1,6 +1,6 @@
 # dnspx configuration
 
-# DNS 服务器
+# 上游公共 DNS 服务器
 nameservers:
     - "119.29.29.29"
     - "223.5.5.5"
@@ -9,7 +9,7 @@ nameservers:
     - ["8.8.8.8", "foreign"]
     - ["208.67.222.222", "foreign"]
 
-# 向 DNS 服务器查询时的默认超时时间
+# 向上游 DNS 服务器查询时的默认超时时间
 query_timeout: 2
 # 向海外 DNS 服务器查询时的超时时间
 foreign_query_timeout: 5
