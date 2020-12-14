@@ -12,9 +12,13 @@ import struct
 import logging
 import ipaddress
 from importlib import import_module
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 from urllib.parse import urlparse
-from urllib.request import urlopen, Request as HTTPRequest
+from urllib.request import (
+    Request as HTTPRequest,
+    ProxyHandler as HTTPProxyHandler,
+    build_opener as build_http_opener,
+)
 
 import dns.query
 import dns.message
@@ -249,17 +253,37 @@ class _HTTPQuery(_BaseQuery):
     def url(self):
         return str(self.nameserver)
 
+    @property
+    def _opener(self):
+        if not self.proxyserver:
+            return build_http_opener()
+
+        if self.proxyserver.scheme.startswith("socks"):
+            socks = import_module("socks")
+            SocksiPyHandler = import_module("sockshandler").SocksiPyHandler
+            socks_type = getattr(
+                socks, "PROXY_TYPE_" + self.proxyserver.scheme.upper()
+            )
+            socks_handler = SocksiPyHandler(
+                socks_type,
+                self.proxyserver.hostname,
+                self.proxyserver.port,
+                rdns=True,
+                username=self.proxyserver.username,
+                password=self.proxyserver.password,
+            )
+            opener = build_http_opener(socks_handler)
+        else:
+            proxy_handler = HTTPProxyHandler({
+                'http': self.proxyserver, 'https': self.proxyserver
+            })
+            opener = build_http_opener(proxy_handler)
+        return opener
+
     def request(self):
-        headers = {
-            "Content-Type": "application/dns-message",
-        }
-        req = HTTPRequest(
-            self.url,
-            data=self.qdata,
-            headers=headers,
-            method="POST"
-        )
-        with urlopen(req, timeout=self.timeout) as resp:
+        req = HTTPRequest(self.url, data=self.qdata, method="POST")
+        req.add_header("Content-Type", "application/dns-message")
+        with self._opener.open(req, timeout=self.timeout) as resp:
             if resp.status != 200:
                 raise
             self.adata = resp.read()
@@ -287,6 +311,11 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
     for nameserver in nameservers:
         if qmsg.qname_str == nameserver.host:
             continue
+        _proxyserver = (
+            None
+            if config.ONLY_FOREIGN_PROXY and not nameserver.is_foreign
+            else proxyserver
+        )
         _timeout = (
             config.FOREIGN_QUERY_TIMEOUT  # 海外 DNS 速度较慢，超时可设长一点
             if nameserver.is_foreign and config.FOREIGN_QUERY_TIMEOUT > 0
@@ -295,7 +324,7 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
         if nameserver.is_doh:
             query = _HTTPQuery(
                 qmsg, nameserver,
-                proxyserver=proxyserver,
+                proxyserver=_proxyserver,
                 timeout=_timeout
             )
         else:
@@ -303,7 +332,7 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
                      else _TCPQuery)
             query = Query(
                 qmsg, nameserver,
-                proxyserver=proxyserver,
+                proxyserver=_proxyserver,
                 socket_family=qmsg.qsocket_family,
                 timeout=_timeout
             )
@@ -622,8 +651,7 @@ class ForeignResolverPlugin(object):
     @cached_property
     def _socks_proxies(self):
         proxies = set(config.PROXY_SERVERS or [])
-        foreign_proxies = set(config.FOREIGN_PROXY_SERVERS or [])
-        return list(urlparse(proxy) for proxy in foreign_proxies | proxies)
+        return list(urlparse(proxy) for proxy in proxies)
 
     @property
     def proxyserver(self):

@@ -77,7 +77,6 @@ def main():
         "cacheout",
     ]
     setup_args["extras_require"] = {
-        "http": ["requests"],
         "socks": ["pysocks"],
     }
     setup_args["entry_points"] = {

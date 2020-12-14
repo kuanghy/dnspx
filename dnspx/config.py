@@ -91,11 +91,9 @@ FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
 # 服务监听地址
 SERVER_LISTEN = "127.0.0.1:53"
 
-# 代理服务器，配置时所有 DNS 查询均通过该代理
+# 网络代理服务器
 PROXY_SERVERS = None
-
-# 海外 DNS 查询时的代理服务器
-FOREIGN_PROXY_SERVERS = None
+ONLY_FOREIGN_PROXY = False  # 仅对海外 DNS 使用代理
 
 # 服务器运行的进程优先级，值为 -20 到 19，仅 Unix 环境有效
 PROCESS_PRIORITY = 0
