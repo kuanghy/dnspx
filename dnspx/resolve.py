@@ -256,10 +256,10 @@ class _HTTPQuery(_BaseQuery):
         req = HTTPRequest(
             self.url,
             data=self.qdata,
-            headers=None,
+            headers=headers,
             method="POST"
         )
-        with urlopen(req) as resp:
+        with urlopen(req, timeout=self.timeout) as resp:
             if resp.status != 200:
                 raise
             self.adata = resp.read()

@@ -47,6 +47,9 @@ NAMESERVERS = DEFAULT_NAMESERVERS = [
     "114.114.115.115",  # 114DNS 备用地址
     "114.114.114.119",  # 114DNS 拦截钓鱼病毒木马网站
     "114.114.114.110",  # 114DNS 拦截色情网站
+
+    # DNS over HTTP Servers
+    ("https://cloudflare-dns.com/dns-query", "foreign", "CloudFlare DoH")
 ]
 
 # 往上游 DNS 服务器查询时的默认超时时间，单位为秒
