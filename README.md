@@ -47,12 +47,6 @@ pip install dnspx
 dnspx --help
 ```
 
-## TODO
-
-- 支持请求上游的 HTTPDNS
-- 支持作为 HTTPDNS 的服务器
-- 支持命令行工具与服务交互
-
 ## 参考链接
 
 - [https://github.com/rthalley/dnspython](https://github.com/rthalley/dnspython)
