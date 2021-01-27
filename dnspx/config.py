@@ -8,6 +8,8 @@ _sys = __import__("sys")
 _log = __import__("logging").getLogger(__name__)
 
 # 判断系统平台
+IS_WIN32 = _sys.platform == 'win32'
+IS_CYGWIN = _sys.platform == 'cygwin'
 IS_WINDOWS = _sys.platform in ['win32', 'cygwin']
 IS_MACOSX = _sys.platform == 'darwin'
 IS_LINUX = _sys.platform.startswith('linux')

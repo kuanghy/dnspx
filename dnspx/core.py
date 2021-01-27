@@ -172,7 +172,13 @@ class DNSProxyServer(object):
         return resolver
 
     def set_priority(self):
-        curr_priority = os.getpriority(os.PRIO_PROCESS, 0)
+        if not hasattr(os, "getpriority") or not hasattr(os, "setpriority"):
+            return
+        try:
+            curr_priority = os.getpriority(os.PRIO_PROCESS, 0)
+        except Exception as ex:
+            log.warning(f"Get process priority error: {ex}")
+            return
         priority = int(config.PROCESS_PRIORITY)
         if curr_priority == priority:
             return
@@ -199,9 +205,10 @@ class DNSProxyServer(object):
                 self._tcp_server.shutdown()
             raise SystemExit(f"Received signal {signum}")
 
-        signal.signal(signal.SIGHUP, handle_signal)
-        signal.signal(signal.SIGINT, handle_signal)
-        signal.signal(signal.SIGTERM, handle_signal)
+        for sig in ("SIGHUP", "SIGINT", "SIGTERM"):
+            sig = getattr(signal, sig, None)
+            if sig:
+                signal.signal(sig, handle_signal)
 
     def set_proctitle(self):
         if is_tty():
@@ -217,8 +224,10 @@ class DNSProxyServer(object):
             log.debug(f"Set process title error: {ex}")
 
     def run(self):
-        self.set_priority()
         self.register_signal_handler()
+
+        self.set_priority()
+        self.set_proctitle()
 
         self._udp_server = ThreadedUDPServer(
             self.server_address,
@@ -246,7 +255,6 @@ class DNSProxyServer(object):
             self._tcp_server_thread.start()
         log.info("DNSPX server started on address '%s:%s'",
                  *self.server_address)
-        self.set_proctitle()
 
         nap_seconds = 60 * 10
         try:
