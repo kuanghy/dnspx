@@ -537,7 +537,10 @@ class LocalHostsPlugin(object):
         self._ipv6_local = "::1"
 
     def get_sys_hosts_path(self):
-        return "/etc/hosts"
+        if config.IS_WIN32:
+            return r"C:\Windows\System32\drivers\etc\hosts"
+        else:
+            return "/etc/hosts"
 
     @staticmethod
     def fetch_config_files(path):
@@ -574,7 +577,7 @@ class LocalHostsPlugin(object):
         if not path or not os.path.exists(path):
             return hosts
 
-        with open(path) as fp:
+        with open(path, encoding="utf-8") as fp:
             for line in fp:
                 line = line.strip()
                 if not line or line.startswith("#"):

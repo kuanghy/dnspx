@@ -160,7 +160,7 @@ _CONFIG_DIRS = [
     '/usr/local/etc/dnspx',
     _os.path.join(USER_HOME, '.local', 'etc', 'dnspx'),
     _os.path.join(USER_HOME, '.config', 'dnspx'),
-    _os.getenv("PWD"),
+    _os.path.join(_os.getcwd(), 'config')
 ]
 
 # 标记配置是否已被加载过
@@ -197,7 +197,7 @@ def _parse_yaml_config_file(path):
     except ImportError:
         from yaml import Loader
 
-    with open(path) as fp:
+    with open(path, encoding="utf-8") as fp:
         _config = yaml.load(fp, Loader=Loader)
     globals().update({key.upper(): val for key, val in _config.items()})
 
@@ -207,7 +207,7 @@ def _parse_config_file(path):
     if fileext in {".yml", ".yaml"}:
         _parse_yaml_config_file(path)
     else:
-        with open(path) as fp:
+        with open(path, encoding="utf-8") as fp:
             code = compile(fp.read(), path, "exec")
         exec(code, globals(), globals())
 
@@ -218,16 +218,23 @@ def load_config(path=None, reset=False):
     if _HAS_BEEN_LOADED and not reset:
         return _sys.modules[__name__]
 
-    config_paths = _get_default_config_paths() + [
-        _os.getenv("DNSPX_CONFIG_PATH"),
-        path,
-    ]
+    if path and _os.path.isdir(path):
+        _CONFIG_DIRS.append(path)
+    env_path = _os.getenv("DNSPX_CONFIG_PATH")
+    if env_path and _os.path.isdir(env_path):
+        _CONFIG_DIRS.append(env_path)
 
-    for path in config_paths:
-        if not path or not _os.path.exists(path):
+    config_paths = _get_default_config_paths()
+    if path and _os.path.isfile(path):
+        config_paths.append(path)
+    if env_path and _os.path.isfile(env_path):
+        config_paths.append(env_path)
+
+    for cfg_path in config_paths:
+        if not cfg_path or not _os.path.exists(cfg_path):
             continue
-        _log.debug("Load config: %s", path)
-        _parse_config_file(path)
+        _log.debug("Load config: %s", cfg_path)
+        _parse_config_file(cfg_path)
 
     _HAS_BEEN_LOADED = True
     return _sys.modules[__name__]

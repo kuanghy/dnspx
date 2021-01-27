@@ -13,6 +13,8 @@ DNS 代理查询服务工具，旨在构建一个本地的轻量级的 DNS 服�
 
 ## 安装
 
+### Unix 平台
+
 ```shell
 pip install dnspx
 ```
@@ -46,6 +48,19 @@ pip install dnspx
 ```
 dnspx --help
 ```
+
+### Windows
+
+安装完成后，注册系统服务，让程序隋系统自动启动（假设安装到了 `D:\dnspx` 目录下）：
+
+```
+sc create dnspx binPath= "D:\dnspx\dnspx.exe --config D:\dnspx\config" start= delayed-auto displayname= dnspx
+```
+
+- 启动服务: `net start dnspx`
+- 停止服务: `net stop dnspx`
+- 删除服务: `sc delete dnspx`
+
 
 ## 参考链接
 

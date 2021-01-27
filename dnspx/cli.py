@@ -34,7 +34,7 @@ def parse_arguments(args):
                  "overwrite LOCAL_HOSTS_PATH configuration")
 
     general_group = parser.add_argument_group(title="general arguments")
-    add_arg(general_group, "--config", help="Path to config file")
+    add_arg(general_group, "--config", help="Path to config file or directory")
     add_arg(general_group, "--loglevel",
             choices=["debug", "info", "warning", "error", "fatal",
                      "critical"],

@@ -294,8 +294,12 @@ def setup_logging(reset=False, enable_rotate_log=False,
     def _add_rotating_file_handler(logfile, level):
         logsize = int(rotate_log_maxsize or (20 * 1024 * 1024))
         backups = int(rotate_log_backups or 10)
-        file_handler = RotatingFileHandler(logfile, maxBytes=logsize,
-                                           backupCount=backups)
+        file_handler = RotatingFileHandler(
+            logfile,
+            maxBytes=logsize,
+            backupCount=backups,
+            encoding="utf-8",
+        )
         file_handler.setLevel(level)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
