@@ -3,6 +3,7 @@
 # Copyright (c) Huoty, All rights reserved
 # Author: Huoty <sudohuoty@163.com>
 
+import os
 import sys
 import time
 import socket
@@ -292,6 +293,9 @@ def setup_logging(reset=False, enable_rotate_log=False,
         logger.addHandler(stream_handler)
 
     def _add_rotating_file_handler(logfile, level):
+        if config.APP_LOG_PATH and logfile.startswith(config.APP_LOG_PATH):
+            if not os.path.exists(config.APP_LOG_PATH):
+                os.makedirs(config.APP_LOG_PATH, exist_ok=True)
         logsize = int(rotate_log_maxsize or (20 * 1024 * 1024))
         backups = int(rotate_log_backups or 10)
         file_handler = RotatingFileHandler(

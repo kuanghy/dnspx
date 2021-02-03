@@ -51,12 +51,12 @@ dnspx --help
 
 ### Windows
 
-从 [Releases](https://github.com/kuanghy/dnspx/releases) 页面下载最新的发布版进行安装。或者 clone 本项目到本地，参考脚本 [build-app.bat](./scripts/build-app.bat) 自动构建。
+从 [Releases](https://github.com/kuanghy/dnspx/releases) 页面下载最新的发布版进行安装。或者 clone 本项目到本地，参考脚本 [build-app.bat](./scripts/build-app.bat) 自行构建。
 
 安装完成后，可注册系统服务，让程序随系统自动启动（假设安装到了 `D:\dnspx` 目录下）：
 
 ```
-sc create dnspx binPath= "D:\dnspx\dnspx.exe --config D:\dnspx\config" start= delayed-auto displayname= dnspx
+sc create dnspx binPath= D:\dnspx\dnspx.exe start= delayed-auto displayname= dnspx
 ```
 
 服务操作：

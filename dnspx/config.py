@@ -16,7 +16,6 @@ IS_LINUX = _sys.platform.startswith('linux')
 
 IS_UNIX = (IS_MACOSX or IS_LINUX)
 
-
 # 用户主目录
 USER_HOME = _os.getenv("HOME", "/home/server")
 
@@ -154,6 +153,19 @@ EMAIL_PASSWD = ""     # 发件邮箱密码
 EMAIL_TOADDRS = []    # 收件人列表
 
 
+# Windows 平台下打包的可执行程序路径
+APP_PATH = None
+APP_LOG_PATH = None
+APP_BUNDLE_PATH = None
+if IS_WIN32 and getattr(_sys, 'frozen', False):
+    APP_PATH = _os.path.dirname(_sys.executable)
+    APP_LOG_PATH = _os.path.join(APP_PATH, "logs")
+    APP_BUNDLE_PATH = getattr(_sys, '_MEIPASS', None)
+
+    if not ROTATE_LOG_FILE:
+        ROTATE_LOG_FILE = _os.path.join(APP_LOG_PATH, "dnspx.log")
+
+
 # 配置文件目录
 _CONFIG_DIRS = [
     '/etc/dnspx/',
@@ -223,6 +235,8 @@ def load_config(path=None, reset=False):
     env_path = _os.getenv("DNSPX_CONFIG_PATH")
     if env_path and _os.path.isdir(env_path):
         _CONFIG_DIRS.append(env_path)
+    if APP_PATH:
+        _CONFIG_DIRS.append(_os.path.join(APP_PATH, "config"))
 
     config_paths = _get_default_config_paths()
     if path and _os.path.isfile(path):

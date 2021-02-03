@@ -229,6 +229,12 @@ class DNSProxyServer(object):
         self.set_priority()
         self.set_proctitle()
 
+        if config.APP_PATH:
+            log.debug("Change working directory to '%s'", config.APP_PATH)
+            os.chdir(config.APP_PATH)
+        if config.APP_BUNDLE_PATH:
+            log.debug("Application bundle path: %s", config.APP_BUNDLE_PATH)
+
         self._udp_server = ThreadedUDPServer(
             self.server_address,
             UDPHandler,
