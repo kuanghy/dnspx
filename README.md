@@ -19,7 +19,13 @@ DNS 代理查询服务工具，旨在构建一个本地的轻量级的 DNS 服�
 pip install dnspx
 ```
 
-配置文件支持以下位置：
+查看帮助：
+
+```
+dnspx --help
+```
+
+配置文件可参考：[config.example.yml](./config.example.yml)，配置文件支持以下位置：
 
 ```
 /etc/dnspx/config.yml
@@ -28,9 +34,7 @@ pip install dnspx
 ~/.config/dnspx/config.yml
 ```
 
-配置文件可参考：[config.example.yml](./config.example.yml)
-
-本地 hosts 文件支持以下位置：
+支持加载多个自定义 hosts 文件，用于过滤广告等，自定义 hosts 文件支持以下位置：
 
 ```
 /etc/dnspx/hosts
@@ -43,19 +47,19 @@ pip install dnspx
 ~/.config/dnspx/hosts.d/*
 ```
 
-查看帮助：
-
-```
-dnspx --help
-```
+在 unix 平台（如 Linux，MacOSX）推荐使用 supervisor 部署服务，配置文件可参考 [supervisor.example.conf](./supervisor.example.conf)。
 
 ### Windows
 
-安装完成后，注册系统服务，让程序隋系统自动启动（假设安装到了 `D:\dnspx` 目录下）：
+从 [Releases](https://github.com/kuanghy/dnspx/releases) 页面下载最新的发布版进行安装。或者 clone 本项目到本地，参考脚本 [build-app.bat](./scripts/build-app.bat) 自动构建。
+
+安装完成后，可注册系统服务，让程序随系统自动启动（假设安装到了 `D:\dnspx` 目录下）：
 
 ```
 sc create dnspx binPath= "D:\dnspx\dnspx.exe --config D:\dnspx\config" start= delayed-auto displayname= dnspx
 ```
+
+服务操作：
 
 - 启动服务: `net start dnspx`
 - 停止服务: `net stop dnspx`
