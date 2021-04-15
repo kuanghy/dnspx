@@ -37,6 +37,7 @@ NAMESERVERS = DEFAULT_NAMESERVERS = [
     ("1.1.1.1", "foreign", "CloudFlare DNS，号称全球最快的 DNS 服务"),
     ("8.8.8.8", "foreign", "Google Public DNS"),
     ("208.67.222.222", "foreign", "OpenDNS"),
+    ("9.9.9.9", "foreign", "IBM Quad9"),
     ("199.85.126.30", "foreign", "Norton ConnectSafe DNS C"),
     ("199.85.126.20", "foreign", "Norton ConnectSafe DNS B"),
     ("199.85.126.10", "foreign", "Norton ConnectSafe DNS A"),
@@ -77,6 +78,12 @@ FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
     "youtube.com",
     "github.com",
     "github.io",
+    "stackoverflow.com",
+    "yahoo.com",
+    "amazon.com",
+    "facebook.com",
+    "twitter.com",
+    "githubusercontent.com",
     "full:wikipedia.org",
     "full:www.wikipedia.org",
     "python.org",
@@ -84,6 +91,7 @@ FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
     "gnome-look.org",
     "googleapis.com",
     "gitbook.com",
+    "wordpress.com",
 
     # "sina.com",  # 部分匹配，匹配 sina.com、sina.com.cn、www.sina.com 等
     # "full:google.com",  # 完全匹配，仅匹配 google.com

@@ -29,6 +29,11 @@ foreign_domains:
     - "youtube.com"
     - "github.com"
     - "github.io"
+    - "stackoverflow.com"
+    - "yahoo.com"
+    - "amazon.com"
+    - "facebook.com"
+    - "twitter.com"
     - "githubusercontent.com"
     - "full:wikipedia.org"
     - "full:www.wikipedia.org"
@@ -37,6 +42,7 @@ foreign_domains:
     - "gnome-look.org"
     - "googleapis.com"
     - "gitbook.com"
+    - "wordpress.com"
 
 # 服务监听地址
 server_listen: "127.0.0.1:53"
