@@ -8,6 +8,12 @@ nameservers:
     - ["1.1.1.1", "foreign"]
     - ["8.8.8.8", "foreign"]
     - ["208.67.222.222", "foreign"]
+    - "https://dns.alidns.com/dns-query"
+    - "https://doh.pub/dns-query"
+    - "https://doh.360.cn/dns-query"
+    - ["https://doh.opendns.com/dns-query", "foreign"]
+    - ["https://dns.google/dns-query", "foreign"]
+    - ["https://cloudflare-dns.com/dns-query", "foreign"]
 
 # 向上游 DNS 服务器查询时的默认超时时间
 query_timeout: 2
@@ -43,6 +49,9 @@ foreign_domains:
     - "googleapis.com"
     - "gitbook.com"
     - "wordpress.com"
+    - "opendns.com",
+    - "cloudflare-dns.com",
+    - "dns.google",
 
 # 服务监听地址
 server_listen: "127.0.0.1:53"

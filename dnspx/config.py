@@ -52,6 +52,10 @@ NAMESERVERS = DEFAULT_NAMESERVERS = [
 
     # DNS over HTTP (DOH)服务器
     # 不能只单独配置 DOH，需要配合至少一个 UDP 或 TCP 的上游服务器使用
+    "https://dns.alidns.com/dns-query",
+    "https://doh.pub/dns-query",
+    "https://doh.360.cn/dns-query",
+    ("https://doh.opendns.com/dns-query", "foreign", "OpenDNS DoH"),
     ("https://cloudflare-dns.com/dns-query", "foreign", "CloudFlare DoH"),
     ("https://dns.google/dns-query", "foreign", "Google DoH"),
 ]
@@ -92,6 +96,9 @@ FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
     "googleapis.com",
     "gitbook.com",
     "wordpress.com",
+    "opendns.com",
+    "cloudflare-dns.com",
+    "dns.google",
 
     # "sina.com",  # 部分匹配，匹配 sina.com、sina.com.cn、www.sina.com 等
     # "full:google.com",  # 完全匹配，仅匹配 google.com
