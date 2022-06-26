@@ -22,7 +22,7 @@ foreign_query_timeout: 5
 
 # 开启查询缓存
 enable_dns_cache: true
-dns_cache_size: 256
+dns_cache_size: 512
 
 # 开启本地 hosts 文件支持
 enable_local_hosts: true
