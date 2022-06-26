@@ -30,6 +30,14 @@ class DNSHandler(object):
 
     DETECTED_NETWORK_ANOMALY = False
 
+    @classmethod
+    def is_network_anomaly(cls):
+        return cls.DETECTED_NETWORK_ANOMALY
+
+    @classmethod
+    def mark_network_anomaly(cls, state):
+        cls.DETECTED_NETWORK_ANOMALY = state
+
     def parse(self, message):
         response = b''
         client = self.client_address[0]
@@ -54,16 +62,22 @@ class DNSHandler(object):
 
         log.info(f"From {client} [{qmsg.id} {qmsg.question_str}]")
         try:
-            amsg = self.server.dns_resolver.query(qmsg)
+            if self.is_network_anomaly():
+                log.debug("Detected network anomaly, response using cache or "
+                          "empty data")
+                amsg = self.server.dns_resolver.query_from_cache(qmsg)
+            else:
+                amsg = self.server.dns_resolver.query(qmsg)
         except (DNSTimeout, DNSUnreachableError) as ex:
             if not self.server.check_nameservers(self.server.socket_type):
                 with thread_sync():
-                    self.__class__.DETECTED_NETWORK_ANOMALY = True
-            amsg = self.server.dns_resolver.query_from_cache(qmsg) or b''
+                    self.mark_network_anomaly(True)
+                log.info("Network is marked as anomaly")
+            amsg = self.server.dns_resolver.query_from_cache(qmsg)
             log.warning(f"Query [{qmsg.question_str}] failed: {ex}")
         except Exception:
+            amsg = b''
             log.exception(f"Query [{qmsg.question_str}] failed")
-            return response
 
         response = amsg.to_wire() if isinstance(amsg, DNSMessage) else amsg
         return response
@@ -104,6 +118,8 @@ class BaseSocketServer(socketserver.ThreadingMixIn):
         self.address_family = address_family
 
         self.check_nameservers = dns_resolver.check_nameservers
+        self.is_network_anomaly = RequestHandlerClass.is_network_anomaly
+        self.mark_network_anomaly = RequestHandlerClass.mark_network_anomaly
 
     def process_request(self, request, client_address):
         thread_count = threading.active_count()
@@ -112,15 +128,10 @@ class BaseSocketServer(socketserver.ThreadingMixIn):
                         thread_count)
             self.socket.sendto(b'', client_address)
             return
-        if self.RequestHandlerClass.DETECTED_NETWORK_ANOMALY:
-            if not self.check_nameservers():
-                log.warning("Detected network anomaly, response to an empty data")
-                self.socket.sendto(b'', client_address)
-                return
-            else:
-                with thread_sync():
-                    self.RequestHandlerClass.DETECTED_NETWORK_ANOMALY = False
-                self.dns_resolver.clear_cache()
+        if self.is_network_anomaly() and self.check_nameservers():
+            with thread_sync():
+                self.mark_network_anomaly(False)
+            log.info("Network has been restored")
         super().process_request(request, client_address)
 
 

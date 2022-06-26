@@ -496,12 +496,14 @@ class DNSResolver(object):
             random.choice(self._socks_proxies) if self._socks_proxies else None
         )
 
-    def query_from_cache(self, qmsg):
+    def query_from_cache(self, qmsg, default=b''):
         data = self.get_cache(qmsg.qname_str, qmsg.qclass, qmsg.qtype)
         if data:
             data.id = qmsg.id
             log.debug(f"Query [{qmsg.question_str}] cache is valid, use it")
             return data
+        else:
+            return default
 
     def query(self, qmsg):
         is_multi_question = qmsg.question_len > 1
