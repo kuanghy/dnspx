@@ -17,6 +17,7 @@ import dns.message
 from dns.message import Message as DNSMessage
 
 from . import config
+from .version import __version__
 from .utils import cached_property, suppress, thread_sync, is_tty
 from .resolve import DNSResolver
 from .error import DNSTimeout, DNSUnreachableError
@@ -54,16 +55,17 @@ class DNSHandler(object):
         log.info(f"From {client} [{qmsg.id} {qmsg.question_str}]")
         try:
             amsg = self.server.dns_resolver.query(qmsg)
-            response = amsg.to_wire() if isinstance(amsg, DNSMessage) else amsg
-        except Exception as ex:
-            _log = log.exception
-            if isinstance(ex, (DNSTimeout, DNSUnreachableError)):
-                if not self.server.check_nameservers(self.server.socket_type):
-                    with thread_sync():
-                        self.__class__.DETECTED_NETWORK_ANOMALY = True
-                _log = log.warning
-            _log(f"DNS query failed, question: {qmsg.question_str}, msg: {ex}")
+        except (DNSTimeout, DNSUnreachableError) as ex:
+            if not self.server.check_nameservers(self.server.socket_type):
+                with thread_sync():
+                    self.__class__.DETECTED_NETWORK_ANOMALY = True
+            amsg = self.server.dns_resolver.query_from_cache(qmsg) or b''
+            log.warning(f"Query [{qmsg.question_str}] failed: {ex}")
+        except Exception:
+            log.exception(f"Query [{qmsg.question_str}] failed")
+            return response
 
+        response = amsg.to_wire() if isinstance(amsg, DNSMessage) else amsg
         return response
 
 
@@ -225,9 +227,9 @@ class DNSProxyServer(object):
 
     def run(self):
         self.register_signal_handler()
-
         self.set_priority()
         self.set_proctitle()
+        log.debug(f"DNSPX version {__version__}")
 
         if config.APP_PATH:
             log.debug("Change working directory to '%s'", config.APP_PATH)

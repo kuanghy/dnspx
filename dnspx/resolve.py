@@ -342,8 +342,8 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
             _log = log.exception
             if isinstance(ex, (OSError, DNSTimeout, BadDNSResponse)):
                 _log = log.warning
-            _log(f"Proxy query failed, question: @{nameserver} "
-                 f"{qmsg.id} {qmsg.question_str}, msg: {ex}")
+            _log(f"Proxy query [@{nameserver} {qmsg.id} {qmsg.question_str}] "
+                 f"failed: {ex}")
         else:
             log.info(f"Proxy to {nameserver} [{qmsg.id} {qmsg.question_str}] "
                      f"{(response_time * 1000):.2f} msec")
@@ -357,7 +357,7 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
 class DNSResolver(object):
 
     def __init__(self, nameservers=None, timeout=3):
-        self._nameservers = nameservers or []
+        self._nameservers = nameservers or config.NAMESERVERS or []
         self.timeout = timeout
 
     @thread_sync()
@@ -365,7 +365,7 @@ class DNSResolver(object):
         servers = [
             NameServer(
                 *(server[:3] if isinstance(server, (tuple, list)) else [server])
-            ) for server in self._nameservers + (config.NAMESERVERS or [])
+            ) for server in self._nameservers
         ]
         return servers
 
@@ -444,20 +444,17 @@ class DNSResolver(object):
     def run_plugins(self, qmsg):
         """运行插件
 
-        如果有插件返回 DNSMessage 对象，则用用该返回值作为解析结果返回，
-        如果有多个插件返回 DNSMessage 对象，则以最后一个插件的返回值作为解析结果返回
-        如果没有插件返回 DNSMessage 对象，且有插件执行成功，则返回 True
-        如果没有插件执行成功则返回 False
+        如果有插件返回一个非空值，则直接返回该值，所有插件均未返回非空值时返回 None
         """
-        is_successful = False
         resp_msg = None
         for name, plugin in self.plugins.items():
             ret = plugin(qmsg)
-            if isinstance(ret, DNSMessage):
+            if ret and not isinstance(ret, bool):
                 resp_msg = ret
-            if ret is not False:
-                is_successful = True
-        return is_successful if resp_msg is None else resp_msg
+                break
+            elif ret is False:
+                log.warning(f"return False when running plugin {name!r}")
+        return resp_msg
 
     @cached_property
     def query_cache(self):
@@ -499,40 +496,41 @@ class DNSResolver(object):
             random.choice(self._socks_proxies) if self._socks_proxies else None
         )
 
+    def query_from_cache(self, qmsg):
+        data = self.get_cache(qmsg.qname_str, qmsg.qclass, qmsg.qtype)
+        if data:
+            data.id = qmsg.id
+            log.debug(f"Query [{qmsg.question_str}] cache is valid, use it")
+            return data
+
     def query(self, qmsg):
-        name = qmsg.qname_str
-        qclass = qmsg.qclass
-        qtype = qmsg.qtype
         is_multi_question = qmsg.question_len > 1
-        question_str = qmsg.question_str
         is_query_op = (qmsg.opcode() == dns.opcode.QUERY)
         enable_dns_cache = config.ENABLE_DNS_CACHE
 
+        # Answer message
+        amsg = None
+
         # 仅对单个请求，且是 Query 查询操作时，执行插件和缓存查询
         if not is_multi_question and is_query_op:
+            # 如果开启了缓存，则从缓存中查询到结果后直接返回
             if enable_dns_cache:
-                data = self.get_cache(name, qclass, qtype)
-                if data:
-                    log.debug(f"Query [{question_str}] cache is valid, use it")
-                    data.id = qmsg.id
-                    return data
-            if qtype in {QTYPE_A,  QTYPE_AAAA}:
-                ret = self.run_plugins(qmsg)
-                if isinstance(ret, DNSMessage):
-                    if enable_dns_cache:
-                        self.set_cache(name, qclass, qtype, ret)
-                    return ret
-                elif isinstance(ret, bytes):
-                    return ret
+                amsg = self.query_from_cache(qmsg)
+                if amsg:
+                    return amsg
 
-        amsg = proxy_dns_query(
-            qmsg, self.nameservers,
-            proxyserver=self.proxyserver,
-            timeout=self.timeout
-        )
-        if (enable_dns_cache and not is_multi_question and is_query_op and
-                isinstance(amsg, DNSMessage)):
-            self.set_cache(name, qclass, qtype, amsg)
+            # 仅对 A, AAAA 类型的查询执行插件
+            if qmsg.qtype in {QTYPE_A,  QTYPE_AAAA}:
+                amsg = self.run_plugins(qmsg)
+
+        if not amsg:
+            amsg = proxy_dns_query(
+                qmsg, self.nameservers,
+                proxyserver=self.proxyserver,
+                timeout=self.timeout
+            )
+        if enable_dns_cache and isinstance(amsg, DNSMessage):
+            self.set_cache(qmsg.qname_str, qmsg.qclass, qmsg.qtype, amsg)
         return amsg
 
 

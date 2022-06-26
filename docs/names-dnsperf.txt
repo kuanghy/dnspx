@@ -10,3 +10,6 @@ blog.konghy.cn A
 163.com MX
 taobao.com A
 12306.com A
+konghy.cn AAAA
+github.com AAAA
+youtube.com NS

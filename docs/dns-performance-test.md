@@ -6,8 +6,9 @@ DNS 服务压力测试
 测试示例：
 
 ```
-dnsperf -d names-dnsperf.txt -s 114.114.114.114
+dnsperf -s 114.114.114.114 -p 53 -d names-dnsperf.txt
 ```
+
 其中 -d 选项指定需要查询的数据文件名，其内容如：
 
 ```
