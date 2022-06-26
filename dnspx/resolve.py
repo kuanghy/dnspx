@@ -374,11 +374,15 @@ class DNSResolver(object):
         return self._fetch_nameservers()
 
     @cached_property
+    def inland_nameservers(self):
+        with thread_sync():
+            servers = [item for item in self.nameservers if not item.is_foreign]
+        return servers
+
+    @cached_property
     def foreign_nameservers(self):
         with thread_sync():
-            servers = [
-                server for server in self.nameservers if server.is_foreign
-            ]
+            servers = [item for item in self.nameservers if item.is_foreign]
         return servers
 
     def check_nameservers(self, socket_type=socket.SOCK_DGRAM):
@@ -403,26 +407,28 @@ class DNSResolver(object):
         log.info(f"Mounted '{name}' plugin")
 
     @thread_sync()
-    def _initialize_plugins(self):
+    def _load_plugins(self):
         plugins = OrderedDict()
         if config.ENABLE_LOCAL_HOSTS:
             self._mount_plugin(
                 plugins, "local_hosts", LocalHostsPlugin()
             )
         if config.ENABLE_FOREIGN_RESOLVER:
+            # 先尝试用海外域名服务器解析，海外域名服务器均失败后再尝试国内的域名服务器
+            nameservers = self.foreign_nameservers + self.inland_nameservers
             self._mount_plugin(
                 plugins, "foreign_resolver",
-                ForeignResolverPlugin(self.foreign_nameservers, self.timeout)
+                ForeignResolverPlugin(nameservers, self.timeout)
             )
         return plugins
 
     @cached_property
     def plugins(self):
-        return self._initialize_plugins()
+        return self._load_plugins()
 
     @thread_sync()
     def mount_plugin(self, name, plugin):
-        """挂载插件
+        """挂载查询插件
 
         需要为插件指定一个唯一的名字，插件需为一个可调用对象，接受一个查询消息对象参数
         如果插件返回一个 DNSMessage 对象，则用该返回值作为解析结果
@@ -430,8 +436,10 @@ class DNSResolver(object):
         """
         self._mount_plugin(self.plugins, name, plugin)
 
-    def unload_plugin(self, name):
+    def unmount_plugin(self, name):
+        """卸载查询插件"""
         self.plugins.pop(name, None)
+        log.info(f"Unmounted '{name}' plugin")
 
     def run_plugins(self, qmsg):
         """运行插件
