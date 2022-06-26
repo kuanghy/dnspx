@@ -22,7 +22,8 @@ def parse_arguments(args):
     add_arg = lambda _p, *args, **kwargs: _p.add_argument(*args, **kwargs)
 
     server_group = parser.add_argument_group(title="server arguments")
-    add_arg(server_group, "-a", "--listen", help="Listen on address")
+    add_arg(server_group, "-a", "--listen",
+            help="Listen on address, e.g. 127.0.0.1:53")
     add_arg(server_group, "-n", "--nameserver",
             help="DNS servers to use with proxied requests")
     add_arg(server_group, "--enable-tcp", action="store_true",
