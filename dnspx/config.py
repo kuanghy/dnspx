@@ -119,8 +119,8 @@ PROCESS_PRIORITY = 0
 # 服务器进程名称
 PROCESS_TITLE = "dnspx: server"
 
-# 最多允许同时有多少个线程处理请求（默认为 CPU 核数的 3 倍）
-MAX_THREAD_NUM = _os.cpu_count() * 3
+# 最多允许同时有多少个线程处理请求（默认为 CPU 核数的 5 倍）
+MAX_THREAD_NUM = _os.cpu_count() * 5
 
 # 开启邮件报告功能，以通过邮件报告运行错误或者运行结果
 ENABLE_MAIL_REPORT = False
