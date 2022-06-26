@@ -469,10 +469,9 @@ class DNSResolver(object):
         return config.DNS_CACHE_TTL + round(random.uniform(1, 6), 2)
 
     def set_cache(self, name, qclass, qtype, amsg):
-        if not amsg.answer:
-            return False
         key = self._get_cache_key(name, qclass, qtype)
-        self.query_cache.set(key, amsg, ttl=self._get_cache_ttl())
+        ttl = self._get_cache_ttl() if amsg.answer else 60
+        self.query_cache.set(key, amsg, ttl=ttl)
         return True
 
     def get_cache(self, name, qclass, qtype):
