@@ -9,6 +9,7 @@ import socket
 import signal
 import logging
 import binascii
+import platform
 import threading
 import socketserver
 from importlib import import_module
@@ -240,7 +241,8 @@ class DNSProxyServer(object):
         self.register_signal_handler()
         self.set_priority()
         self.set_proctitle()
-        log.debug(f"DNSPX version {__version__}")
+        log.debug("DNSPX version %s, Python version %s",
+                  __version__, platform.python_version())
 
         if config.APP_PATH:
             log.debug("Change working directory to '%s'", config.APP_PATH)
