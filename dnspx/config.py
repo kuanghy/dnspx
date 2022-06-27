@@ -190,24 +190,28 @@ _CONFIG_DIRS = [
     _os.path.join(_os.getcwd(), 'config')
 ]
 
+# 被加载的配置文件
+_LOADED_CONFIG_PATHS = []
+
 # 标记配置是否已被加载过
 _HAS_BEEN_LOADED = False
 
 
 def _get_default_config_paths():
-    common_config_suffixes = [".py", ".yml", ".yaml"]  # 公共的配置文件后缀
-    local_config_suffixes = [                          # 本地定制化配置文件后缀
-        ".local" + item for item in common_config_suffixes
-    ]
-    suffixes = [
-        suffix
-        for item in zip(common_config_suffixes, local_config_suffixes)
-        for suffix in item
+    # 配置文件后扩展名
+    config_extnames = [".py", ".yml", ".yaml"]
+    # 本地定制化配置文件扩展名
+    local_config_extnames = [".local" + item for item in config_extnames]
+    extnames = [
+        extname
+        for item in zip(config_extnames, local_config_extnames)
+        for extname in item
     ]
     return [
-        _os.path.join(config_dir, f"dnspx{suffix}")
+        _os.path.join(config_dir, f"{fname}{extname}")
         for config_dir in _CONFIG_DIRS
-        for suffix in suffixes
+        for extname in extnames
+        for fname in ["config", "dnspx"]  # file names
         if config_dir and _os.path.exists(config_dir)
     ]
 
@@ -240,7 +244,7 @@ def _parse_config_file(path):
 
 
 def load_config(path=None, reset=False):
-    global _HAS_BEEN_LOADED
+    global _HAS_BEEN_LOADED, _LOADED_CONFIG_PATHS
     reset = bool(reset or path)
     if _HAS_BEEN_LOADED and not reset:
         return _sys.modules[__name__]
@@ -259,11 +263,17 @@ def load_config(path=None, reset=False):
     if env_path and _os.path.isfile(env_path):
         config_paths.append(env_path)
 
+    loaded_config_paths = []
     for cfg_path in config_paths:
         if not cfg_path or not _os.path.exists(cfg_path):
             continue
         _log.debug("Load config: %s", cfg_path)
         _parse_config_file(cfg_path)
 
+    _LOADED_CONFIG_PATHS = loaded_config_paths
     _HAS_BEEN_LOADED = True
     return _sys.modules[__name__]
+
+
+def get_loaded_config_paths():
+    return _LOADED_CONFIG_PATHS

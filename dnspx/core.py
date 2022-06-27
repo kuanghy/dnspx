@@ -170,8 +170,10 @@ class DNSProxyServer(object):
 
     @cached_property
     def dns_resolver(self):
+        log.info("Initializing resolver")
         timeout = config.QUERY_TIMEOUT
-        log.info("Initializing resolver, timeout is %s seconds", timeout)
+        log.info("Query timeout: %s, foreign query timeout: %s",
+                 timeout, config.FOREIGN_QUERY_TIMEOUT)
         resolver = DNSResolver(self.nameservers, timeout=timeout)
         pugins = resolver.plugins
         hosts_plugin = pugins.get("local_hosts")
@@ -183,6 +185,8 @@ class DNSProxyServer(object):
                     hosts.update(hosts_plugin.parse_hosts_file(config_path))
                 hosts_plugin.hosts.update(hosts)
             log.debug("All local hosts size %s", len(hosts_plugin.hosts))
+        log.debug("All nameservers: %s",
+                  [str(item) for item in resolver.nameservers])
         return resolver
 
     def set_priority(self):
