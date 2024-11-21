@@ -172,13 +172,6 @@ EMAIL_TOADDRS = []    # 收件人列表
 APP_PATH = None
 APP_LOG_PATH = None
 APP_BUNDLE_PATH = None
-if IS_WIN32 and getattr(_sys, 'frozen', False):
-    APP_PATH = _os.path.dirname(_sys.executable)
-    APP_LOG_PATH = _os.path.join(APP_PATH, "logs")
-    APP_BUNDLE_PATH = getattr(_sys, '_MEIPASS', None)
-
-    if not ROTATE_LOG_FILE:
-        ROTATE_LOG_FILE = _os.path.join(APP_LOG_PATH, "dnspx.log")
 
 
 # 配置文件目录
@@ -248,6 +241,29 @@ def load_config(path=None, reset=False):
     reset = bool(reset or path)
     if _HAS_BEEN_LOADED and not reset:
         return _sys.modules[__name__]
+
+    if IS_WIN32:
+        global APP_PATH, APP_BUNDLE_PATH, APP_LOG_PATH, ROTATE_LOG_FILE
+
+        if getattr(_sys, 'frozen', False):
+            # pyinstaller 打包的情况
+            APP_PATH = _os.path.dirname(_sys.executable)
+            APP_BUNDLE_PATH = getattr(_sys, '_MEIPASS', None)
+        elif "__compiled__" in globals():
+            # nuitka 打包的情况
+            try:
+                APP_PATH = _os.path.dirname(__compiled__.original_argv0)  # noqa
+            except Exception:
+                try:
+                    APP_PATH = _os.path.dirname(_os.path.dirname(__file__))
+                except Exception as ex:
+                    _log.warning("failed to get app path: %s", ex)
+
+        # 默认将日志写到 APP 路径下
+        if APP_PATH:
+            APP_LOG_PATH = _os.path.join(APP_PATH, "logs")
+            if not ROTATE_LOG_FILE:
+                ROTATE_LOG_FILE = _os.path.join(APP_LOG_PATH, "dnspx.log")
 
     if path and _os.path.isdir(path):
         _CONFIG_DIRS.append(path)

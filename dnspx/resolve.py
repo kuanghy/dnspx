@@ -487,7 +487,7 @@ class DNSResolver(object):
     @cached_property
     def _socks_proxies(self):
         proxies = set(config.PROXY_SERVERS or [])
-        return list(urlparse(proxy) for proxy in proxies)
+        return [urlparse(proxy) for proxy in proxies]
 
     @property
     def proxyserver(self):
