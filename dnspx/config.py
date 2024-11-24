@@ -242,7 +242,7 @@ def load_config(path=None, reset=False):
     if _HAS_BEEN_LOADED and not reset:
         return _sys.modules[__name__]
 
-    if IS_WIN32:
+    if IS_WINDOWS:
         global APP_PATH, APP_BUNDLE_PATH, APP_LOG_PATH, ROTATE_LOG_FILE
 
         if getattr(_sys, 'frozen', False):

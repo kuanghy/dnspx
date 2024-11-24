@@ -238,7 +238,7 @@ class DNSProxyServer(object):
         self._keep_running = False
 
     def register_signal_handler(self):
-        if config.IS_WIN32 and not is_main_thread():
+        if config.IS_WINDOWS and not is_main_thread():
             log.info("This is not main thread, skip register signal handler")
             return
 
