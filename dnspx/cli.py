@@ -5,10 +5,11 @@
 
 import sys
 import logging
+from importlib import import_module
 from argparse import ArgumentParser
 
 from .version import version_str as version
-from .config import load_config
+from .config import IS_WINDOWS, load_config
 from .log import basic_config as log_basic_config, setup_logging
 from .utils import parse_ip_port
 from .core import DNSProxyServer
@@ -35,6 +36,7 @@ def parse_arguments(args):
                  "overwrite LOCAL_HOSTS_PATH configuration")
 
     general_group = parser.add_argument_group(title="general arguments")
+    add_arg(general_group, "--service", help="As a windows service")
     add_arg(general_group, "--config", help="Path to config file or directory")
     add_arg(general_group, "--loglevel",
             choices=["debug", "info", "warning", "error", "fatal",
@@ -47,12 +49,31 @@ def parse_arguments(args):
     add_arg(general_group, "--enable-mail-report", action="store_true",
             help="Report errors by email")
 
-    return parser.parse_args(args)
+    args = parser.parse_args(args)
+
+    if args.service and not IS_WINDOWS:
+        parser.error("Windows service mode is not supported on this platform.")
+
+    return args
 
 
 def main(args=None):
     if sys.version_info < (3, 6):
         print("Error, only supports Python version 3.6 or later", file=sys.stderr)
+        return
+
+    if IS_WINDOWS and len(sys.argv) >= 2 and sys.argv[1] == '--service':
+        config = load_config()
+        setup_logging(
+            reset=True,
+            enable_rotate_log=config.ENABLE_ROTATE_LOG,
+            enable_time_rotate_log=config.ENABLE_TIME_ROTATE_LOG,
+            enable_smtp_log=config.ENABLE_MAIL_REPORT
+        )
+        loglevel = config.LOGLEVEL
+        logging.getLogger().setLevel(getattr(logging, loglevel.upper()))
+        import_module(".service", __package__).run_as_windows_service()
+        logging.shutdown()
         return
 
     args = parse_arguments(args)

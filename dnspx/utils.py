@@ -141,3 +141,7 @@ def check_internet_socket(host="8.8.8.8", port=53, socket_type=None, timeout=3):
     else:
         sock.close()
         return True
+
+
+def is_main_thread():
+    return threading.current_thread() == threading.main_thread()

@@ -1,6 +1,6 @@
 @echo off
 
-sc create dnspx binPath= D:\dnspx\dnspx.exe start= delayed-auto displayname= dnspx
+sc create DNSPX binPath= "D:\Applications\dnspx\dnspx.exe --service" start= delayed-auto displayname= "DNSPX Service"
 
 pause
 exit

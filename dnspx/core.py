@@ -20,6 +20,7 @@ from dns.message import Message as DNSMessage
 from . import config
 from .version import __version__
 from .utils import cached_property, suppress, thread_sync, is_tty
+from .utils import is_main_thread
 from .resolve import DNSResolver
 from .error import DNSTimeout, DNSUnreachableError
 
@@ -164,6 +165,8 @@ class DNSProxyServer(object):
         self._udp_server_thread = None
         self._tcp_server_thread = None
 
+        self._keep_running = True
+
     @property
     def socket_family(self):
         return socket.AF_INET6 if self.enable_ipv6 else socket.AF_INET
@@ -214,20 +217,6 @@ class DNSProxyServer(object):
         else:
             log.info(f"Set process priority to {priority}")
 
-    def register_signal_handler(self):
-
-        def handle_signal(signum, frame):
-            if self._udp_server:
-                self._udp_server.shutdown()
-            if self._tcp_server:
-                self._tcp_server.shutdown()
-            raise SystemExit(f"Received signal {signum}")
-
-        for sig in ("SIGHUP", "SIGINT", "SIGTERM"):
-            sig = getattr(signal, sig, None)
-            if sig:
-                signal.signal(sig, handle_signal)
-
     def set_proctitle(self):
         if is_tty():
             return
@@ -240,6 +229,27 @@ class DNSProxyServer(object):
             spt.setproctitle(config.PROCESS_TITLE)
         except Exception as ex:
             log.debug(f"Set process title error: {ex}")
+
+    def stop(self):
+        if self._udp_server:
+            self._udp_server.shutdown()
+        if self._tcp_server:
+            self._tcp_server.shutdown()
+        self._keep_running = False
+
+    def register_signal_handler(self):
+        if config.IS_WIN32 and not is_main_thread():
+            log.info("This is not main thread, skip register signal handler")
+            return
+
+        def handle_signal(signum, frame):
+            self.stop()
+            raise SystemExit(f"Received signal {signum}")
+
+        for sig in ("SIGHUP", "SIGINT", "SIGTERM"):
+            sig = getattr(signal, sig, None)
+            if sig:
+                signal.signal(sig, handle_signal)
 
     def run(self):
         self.register_signal_handler()
@@ -281,13 +291,23 @@ class DNSProxyServer(object):
         log.info("DNSPX server started on address '%s:%s'",
                  *self.server_address)
 
-        nap_seconds = 60 * 10
+        self._keep_running = True
+
+        last_evict_cache_time = 0
         try:
             while True:
-                time.sleep(nap_seconds)
-                with suppress(Exception, logger=log, loglevel="warning"):
-                    self.dns_resolver.evict_cache()
-                    __import__("gc").collect()
-        except SystemExit as ex:
+                if not self._keep_running:
+                    log.info("keep_running is set to %s", self._keep_running)
+                    break
+
+                time.sleep(3)
+
+                # 每十分钟清理一次缓存
+                if time.time() - last_evict_cache_time >= 600:
+                    with suppress(Exception, logger=log, loglevel="warning"):
+                        self.dns_resolver.evict_cache()
+                        __import__("gc").collect()
+                        last_evict_cache_time = time.time()
+        except (SystemExit, Exception) as ex:
             log.warning(ex)
         log.info("DNSPX server is shutting down")
