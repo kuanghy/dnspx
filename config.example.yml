@@ -11,9 +11,11 @@ nameservers:
     - "https://dns.alidns.com/dns-query"
     - "https://doh.pub/dns-query"
     - "https://doh.360.cn/dns-query"
+    - "https://dns.adguard-dns.com/dns-query"
     - ["https://doh.opendns.com/dns-query", "foreign"]
     - ["https://dns.google/dns-query", "foreign"]
     - ["https://cloudflare-dns.com/dns-query", "foreign"]
+    - ["https://101.101.101.101/dns-query", "foreign"]  # 台湾
 
 # 向上游 DNS 服务器查询时的默认超时时间
 query_timeout: 2
