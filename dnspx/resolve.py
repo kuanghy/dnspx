@@ -59,7 +59,7 @@ class NameServer(object):
         self.raw_address = address
         self.type_ = type_
         self.comment = comment
-        self.proxy = proxy
+        self._proxy = proxy
 
     @cached_property
     def _pr_address(self):
@@ -91,9 +91,13 @@ class NameServer(object):
     def address(self):
         return self.host, self.port
 
+    @cached_property
+    def proxy(self):
+        return urlparse(self._proxy) if self._proxy else None
+
     def __repr__(self):
-        return "NameServer(address={}, type={}, comment={})".format(
-            self.raw_address, self.type_, self.comment
+        return "NameServer(address={}, type={}, comment={}, proxy={})".format(
+            self.raw_address, self.type_, self.comment, self._proxy
         )
 
     def __str__(self):
@@ -312,11 +316,12 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
     for nameserver in nameservers:
         if qmsg.qname_str == nameserver.host:
             continue
-        _proxyserver = (
-            None
-            if config.ONLY_FOREIGN_PROXY and not nameserver.is_foreign
-            else proxyserver
-        )
+        if nameserver.proxy:
+            _proxyserver = nameserver.proxy
+        elif config.ONLY_FOREIGN_PROXY and not nameserver.is_foreign:
+            _proxyserver = None
+        else:
+            _proxyserver = proxyserver
         _timeout = (
             config.FOREIGN_QUERY_TIMEOUT  # 海外 DNS 速度较慢，超时可设长一点
             if nameserver.is_foreign and config.FOREIGN_QUERY_TIMEOUT > 0
@@ -367,8 +372,8 @@ class DNSResolver(object):
         for server in self._nameservers:
             if isinstance(server, str):
                 servers.append(NameServer(server))
-            if isinstance(server, (tuple, list)):
-                servers.append(NameServer(server[:4]))
+            elif isinstance(server, (tuple, list)):
+                servers.append(NameServer(*server[:4]))
             elif isinstance(server, dict):
                 servers.append(NameServer(
                     server["address"],
