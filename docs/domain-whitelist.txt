@@ -1,0 +1,2 @@
+otheve.beacon.qq.com
+copilot-telemetry.githubusercontent.com
