@@ -21,8 +21,11 @@ USER_HOME = _os.getenv("HOME", "/home/server")
 
 # 配置公共 DNS 服务器
 # 每一个 DNS 配置可以为一个 tuple，list，每一项包含：
-#     服务器地址，服务器类型，服务器说明
-# 除 服务器地址 外，其他项为非必须项，不指定时取默认值，类型 inland，说明为 None
+#     服务器地址，服务器类型，服务器说明, 代理服务器地址
+# 也可以为一个字典：
+#     {"address": "127.0.0.1", "type": "inland", "comment": "local dns",
+#      "proxy": "socks5://127.0.0.1:1080"}
+# 除 服务器地址 外，其他项为非必须项，不指定时取默认值，类型 inland，其它为 None
 # 如果其类型主要用来标记是国内还是海外，包含两种类型：inland, foreign
 # 服务器端口默认为 53，也可以在地址中指定端口，如 127.0.0.1:50053
 NAMESERVERS = DEFAULT_NAMESERVERS = [

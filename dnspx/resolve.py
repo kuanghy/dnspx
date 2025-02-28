@@ -55,10 +55,11 @@ log = logging.getLogger(__name__)
 
 class NameServer(object):
 
-    def __init__(self, address, type_="inland", comment=None):
+    def __init__(self, address, type_="inland", comment=None, proxy=None):
         self.raw_address = address
         self.type_ = type_
         self.comment = comment
+        self.proxy = proxy
 
     @cached_property
     def _pr_address(self):
@@ -362,11 +363,21 @@ class DNSResolver(object):
 
     @thread_sync()
     def _fetch_nameservers(self):
-        servers = [
-            NameServer(
-                *(server[:3] if isinstance(server, (tuple, list)) else [server])
-            ) for server in self._nameservers
-        ]
+        servers = []
+        for server in self._nameservers:
+            if isinstance(server, str):
+                servers.append(NameServer(server))
+            if isinstance(server, (tuple, list)):
+                servers.append(NameServer(server[:4]))
+            elif isinstance(server, dict):
+                servers.append(NameServer(
+                    server["address"],
+                    server.get("type", "inland"),
+                    server.get("comment"),
+                    server.get("proxy"),
+                ))
+            else:
+                raise ValueError(f'invalid dns server: {server!r}')
         return servers
 
     @cached_property
