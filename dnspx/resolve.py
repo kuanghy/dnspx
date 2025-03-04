@@ -13,6 +13,7 @@ import logging
 import ipaddress
 from importlib import import_module
 from collections import OrderedDict
+from functools import lru_cache
 from urllib.parse import urlparse
 from urllib.request import (
     Request as HTTPRequest,
@@ -708,25 +709,24 @@ class ForeignResolverPlugin(object):
     full_match_prefix = "full:"
     domain_match_prefix = "domain:"
 
-    def __call__(self, qmsg):
-        name = qmsg.qname_str
-        is_foreign = False
+    @lru_cache(200)
+    def check_foreign_domain(self, name):
         for pattern in self.foreign_domains:
             if pattern.startswith(self.full_match_prefix):
                 pattern = pattern.replace(self.full_match_prefix, "")
-                if name == pattern:
-                    is_foreign = True
-                    break
+                if name == pattern:  # 完全匹配
+                    return True
             elif pattern.startswith(self.domain_match_prefix):
                 pattern = pattern.replace(self.domain_match_prefix, "")
-                if name.endswith(pattern):
-                    is_foreign = True
-                    break
-            else:
-                if pattern in name:
-                    is_foreign = True
-                    break
+                if name.endswith(f'.{pattern}'):  # 仅匹配子域名
+                    return True
+            elif pattern == name or name.endswith(f".{pattern}"):
+                return True
+        return False
 
+    def __call__(self, qmsg):
+        name = qmsg.qname_str
+        is_foreign = self.check_foreign_domain(name)
         if not is_foreign:
             return True
 

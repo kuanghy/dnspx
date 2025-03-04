@@ -103,7 +103,7 @@ FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
     "cloudflare-dns.com",
     "dns.google",
 
-    # "sina.com",  # 部分匹配，匹配 sina.com、sina.com.cn、www.sina.com 等
+    # "sina.com",  # 完全匹配和子域名匹配，匹配 sina.com、www.sina.com 等
     # "full:google.com",  # 完全匹配，仅匹配 google.com
     # "domain:google.com",  # 子域名匹配，匹配 xxx.google.com, yyy.google.com 等
     # "ext:/etc/dnspx/foreign-domains",  # 从外部文件中读取配置
