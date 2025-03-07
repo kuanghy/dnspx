@@ -538,7 +538,7 @@ class DNSResolver(object):
                     return amsg
 
             # 仅对 A, AAAA 类型的查询执行插件
-            if qmsg.qtype in {QTYPE_A,  QTYPE_AAAA}:
+            if qmsg.qtype in {QTYPE_A, QTYPE_AAAA}:
                 amsg = self.run_plugins(qmsg)
 
         if not amsg:

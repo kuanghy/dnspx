@@ -67,6 +67,8 @@ foreign_domains:
     - "v2ray.com"
     - "v2fly.org"
     - "v2ray.ws"
+    - "binance.com"
+    - "okx.com"
 
 # 服务监听地址
 server_listen: "127.0.0.1:53"
