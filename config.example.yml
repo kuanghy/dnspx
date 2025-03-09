@@ -72,7 +72,9 @@ domain_group_ali:
     - etao.com
     - cainiao.com
     - aliyun.com
+    - aliyuncs.com
     - alidns.com
+    - alibabadns.com
     - ele.me
 
 domain_group_tencent:
