@@ -63,6 +63,24 @@ NAMESERVERS = DEFAULT_NAMESERVERS = [
     ("https://dns.google/dns-query", "foreign", "Google DoH"),
 ]
 
+# 上游 DNS 服务器组（主要用于实现分流查询），以 NAMESERVER_GROUP 开头
+NAMESERVER_GROUP_FOREIGN = [  # 海外 DNS 服务器组
+    "1.1.1.1"  # Google
+    "8.8.8.8"  # Cloudflare
+    "https://1.1.1.1/dns-query"  # Google DoH
+]
+NAMESERVER_GROUP_ALI = []
+NAMESERVER_GROUP_TENCENT = []
+NAMESERVER_GROUP_BAIDU = []
+NAMESERVER_GROUP_360 = []
+
+# 域名组（主要用于实现分流查询），以 domain_group 开头
+DOMAIN_GROUP_FOREIGN = []  # 海外域名组
+DOMAIN_GROUP_ALI = []
+DOMAIN_GROUP_TENCENT = []
+DOMAIN_GROUP_BAIDU = []
+DOMAIN_GROUP_360 = []
+
 # 往上游 DNS 服务器查询时的默认超时时间，单位为秒
 QUERY_TIMEOUT = 2
 # 往海外 DNS 服务器查询的超时时间，单位为秒
@@ -79,7 +97,7 @@ ENABLE_LOCAL_HOSTS = True
 LOCAL_HOSTS_PATH = None  # 本地 hosts 文件路径，可以为目录或者单个文件
 
 # 开启海外域名用海外 DNS 解析功能
-ENABLE_FOREIGN_RESOLVER = True
+ENABLE_FOREIGN_RESOLVER = False
 FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
     "google.com",
     "youtube.com",
@@ -108,6 +126,16 @@ FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
     # "domain:google.com",  # 子域名匹配，匹配 xxx.google.com, yyy.google.com 等
     # "ext:/etc/dnspx/foreign-domains",  # 从外部文件中读取配置
 ]
+
+# 开启分流查询
+ENABLE_SPLIT_RESOLVE = False
+SPLIT_RESOLVE_MAP = {  # 分流查询映射表
+    "DOMAIN_GROUP_BAIDU": "NAMESERVER_GROUP_BAIDU",
+    "DOMAIN_GROUP_TENCENT": "NAMESERVER_GROUP_TENCENT",
+    "DOMAIN_GROUP_ALI": "NAMESERVER_GROUP_ALI",
+    "DOMAIN_GROUP_360": "NAMESERVER_GROUP_360",
+    "DOMAIN_GROUP_FOREIGN": "NAMESERVER_GROUP_FOREIGN",
+}
 
 # 服务监听地址
 SERVER_LISTEN = "127.0.0.1:53"

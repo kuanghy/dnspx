@@ -62,6 +62,22 @@ class NameServer(object):
         self.comment = comment
         self._proxy = proxy
 
+    @classmethod
+    def parse(cls, server):
+        if isinstance(server, str):
+            return cls(server)
+        elif isinstance(server, (tuple, list)):
+            return cls(*server[:4])
+        elif isinstance(server, dict):
+            return cls(
+                server["address"],
+                server.get("type", "inland"),
+                server.get("comment"),
+                server.get("proxy"),
+            )
+        else:
+            raise ValueError(f'invalid dns server: {server!r}')
+
     @cached_property
     def _pr_address(self):
         return urlparse(
@@ -369,22 +385,7 @@ class DNSResolver(object):
 
     @thread_sync()
     def _fetch_nameservers(self):
-        servers = []
-        for server in self._nameservers:
-            if isinstance(server, str):
-                servers.append(NameServer(server))
-            elif isinstance(server, (tuple, list)):
-                servers.append(NameServer(*server[:4]))
-            elif isinstance(server, dict):
-                servers.append(NameServer(
-                    server["address"],
-                    server.get("type", "inland"),
-                    server.get("comment"),
-                    server.get("proxy"),
-                ))
-            else:
-                raise ValueError(f'invalid dns server: {server!r}')
-        return servers
+        return [NameServer.parse(server) for server in self._nameservers]
 
     @cached_property
     def nameservers(self):
@@ -435,7 +436,11 @@ class DNSResolver(object):
             nameservers = self.foreign_nameservers + self.inland_nameservers
             self._mount_plugin(
                 plugins, "foreign_resolver",
-                ForeignResolverPlugin(nameservers, self.timeout)
+                ForeignResolverPlugin(nameservers)
+            )
+        if config.ENABLE_SPLIT_RESOLVE:
+            self._mount_plugin(
+                plugins, "split_resolver", SplitResolverPlugin()
             )
         return plugins
 
@@ -465,7 +470,11 @@ class DNSResolver(object):
         """
         resp_msg = None
         for name, plugin in self.plugins.items():
-            ret = plugin(qmsg)
+            try:
+                ret = plugin(qmsg)
+            except Exception:
+                log.exception("failed to run plugin {name!r}")
+                continue
             if ret and not isinstance(ret, bool):
                 resp_msg = ret
                 break
@@ -668,12 +677,11 @@ class LocalHostsPlugin(object):
 
 class ForeignResolverPlugin(object):
 
-    def __init__(self, nameservers=None, timeout=3):
+    def __init__(self, nameservers=None):
         self.nameservers = nameservers or [
             ("8.8.8.8", 53),  # Google Public DNS
             ("1.1.1.1", 53),  # CloudFlare DNS
         ]
-        self.timeout = timeout
 
     @cached_property
     def _socks_proxies(self):
@@ -690,7 +698,18 @@ class ForeignResolverPlugin(object):
     def _fetch_foreign_domains(self):
         patterns = set()
         external_config_prefix = "ext:"
-        for pattern in config.FOREIGN_DOMAINS:
+        if not config.FOREIGN_DOMAINS:
+            foreign_domain_patterns = []
+        elif isinstance(config.FOREIGN_DOMAINS, str):
+            domain_group = config.FOREIGN_DOMAINS
+            if domain_group.startswith("domain_group"):
+                raise ValueError("invalid config FOREIGN_DOMAINS")
+            foreign_domain_patterns = getattr(config, domain_group.upper())
+        elif isinstance(config.FOREIGN_DOMAINS, (list, tuple, set)):
+            foreign_domain_patterns = config.FOREIGN_DOMAINS
+        else:
+            raise ValueError("invalid config FOREIGN_DOMAINS")
+        for pattern in foreign_domain_patterns:
             if pattern.startswith(external_config_prefix):
                 config_path = pattern.replace(external_config_prefix, "")
                 with open(config_path) as fp:
@@ -706,18 +725,17 @@ class ForeignResolverPlugin(object):
     def foreign_domains(self):
         return self._fetch_foreign_domains()
 
-    full_match_prefix = "full:"
-    domain_match_prefix = "domain:"
-
     @lru_cache(200)
     def check_foreign_domain(self, name):
+        full_match_prefix = "full:"
+        domain_match_prefix = "domain:"
         for pattern in self.foreign_domains:
-            if pattern.startswith(self.full_match_prefix):
-                pattern = pattern.replace(self.full_match_prefix, "")
+            if pattern.startswith(full_match_prefix):
+                pattern = pattern.replace(full_match_prefix, "")
                 if name == pattern:  # 完全匹配
                     return True
-            elif pattern.startswith(self.domain_match_prefix):
-                pattern = pattern.replace(self.domain_match_prefix, "")
+            elif pattern.startswith(domain_match_prefix):
+                pattern = pattern.replace(domain_match_prefix, "")
                 if name.endswith(f'.{pattern}'):  # 仅匹配子域名
                     return True
             elif pattern == name or name.endswith(f".{pattern}"):
@@ -733,12 +751,75 @@ class ForeignResolverPlugin(object):
         log.debug(f"Domain '{name}' is foreign, using foreign nameserver")
         try:
             amsg = proxy_dns_query(
-                qmsg, self.nameservers,
-                proxyserver=self.proxyserver,
-                timeout=self.timeout,
+                qmsg, self.nameservers, proxyserver=self.proxyserver,
             )
         except Exception as e:
             log.warning(f"Foreign nameservers resolve failed: {e}")
             return False
 
         return amsg
+
+
+class SplitResolverPlugin(object):
+
+    @cached_property
+    def split_resolve_map(self):
+        mapping = {}
+        if not config.SPLIT_RESOLVE_MAP:
+            return mapping
+        for domain_group, nameserver_group in config.SPLIT_RESOLVE_MAP.items():
+            domain_group = domain_group.upper()
+            nameserver_group = nameserver_group.upper()
+            domain_group_list = getattr(config, domain_group)
+            nameserver_group_list = getattr(config, nameserver_group)
+            if domain_group_list and nameserver_group_list:
+                mapping[domain_group] = nameserver_group
+        return mapping
+
+    @thread_sync()
+    def _fetch_grouped_nameservers(self):
+        mapping = {}
+        for nameserver_group in self.split_resolve_map.values():
+            nameserver_group_list = getattr(config, nameserver_group)
+            mapping[nameserver_group] = [
+                NameServer.parse(server) for server in nameserver_group_list
+            ]
+        return mapping
+
+    @cached_property
+    def grouped_nameservers(self):
+        return self._fetch_grouped_nameservers()
+
+    @lru_cache(200)
+    def match_domain(self, name, domain_group_name):
+        full_match_prefix = "full:"
+        domain_match_prefix = "domain:"
+        domain_patterns = getattr(config, domain_group_name.upper())
+        for pattern in domain_patterns:
+            if pattern.startswith(full_match_prefix):
+                pattern = pattern.replace(full_match_prefix, "")
+                if name == pattern:  # 完全匹配
+                    return True
+            elif pattern.startswith(domain_match_prefix):
+                pattern = pattern.replace(domain_match_prefix, "")
+                if name.endswith(f'.{pattern}'):  # 仅匹配子域名
+                    return True
+            elif pattern == name or name.endswith(f".{pattern}"):
+                return True
+        return False
+
+    def __call__(self, qmsg):
+        name = qmsg.qname_str
+        for domain_group, nameserver_group in self.split_resolve_map.items():
+            if not self.match_domain(name, domain_group):
+                continue
+            log.debug("Domain '%s' matches %s, using %s to resolve",
+                      name, domain_group, nameserver_group)
+            nameservers = self.grouped_nameservers[nameserver_group]
+            try:
+                return proxy_dns_query(qmsg, nameservers)
+            except Exception as e:
+                log.warning(f"Foreign nameservers resolve failed: {e}")
+                return False
+
+        return True

@@ -1,21 +1,13 @@
 # dnspx configuration
 
-# 上游公共 DNS 服务器
-nameservers:
-    - "119.29.29.29"
-    - "223.5.5.5"
-    - "114.114.114.114"
-    - ["1.1.1.1", "foreign"]
-    - ["8.8.8.8", "foreign"]
-    - ["208.67.222.222", "foreign"]
-    - "https://dns.alidns.com/dns-query"
-    - "https://doh.pub/dns-query"
-    - "https://doh.360.cn/dns-query"
-    - "https://dns.adguard-dns.com/dns-query"
-    - ["https://doh.opendns.com/dns-query", "foreign"]
-    - ["https://dns.google/dns-query", "foreign"]
-    - ["https://cloudflare-dns.com/dns-query", "foreign"]
-    - ["https://101.101.101.101/dns-query", "foreign"]  # 台湾
+# 服务监听地址
+server_listen: "127.0.0.1:53"
+
+# 服务器运行的进程优先级，值为 -20 到 19，仅 Unix 环境有效
+process_priority: 0
+
+# 日志相关配置
+loglevel: "info"
 
 # 向上游 DNS 服务器查询时的默认超时时间
 query_timeout: 2
@@ -30,51 +22,125 @@ dns_cache_size: 512
 enable_local_hosts: true
 local_hosts_path: null
 
+# 上游公共 DNS 服务器
+nameservers:
+    - "119.29.29.29"
+    - "223.5.5.5"
+    - "114.114.114.114"
+    - ["1.1.1.1", "foreign", "CloudFlare DNS，号称全球最快的 DNS 服务"]
+    - ["8.8.8.8", "foreign", "Google Public DNS"]
+    - ["208.67.222.222", "foreign", "OpenDNS"]
+    - "https://dns.alidns.com/dns-query"
+    - "https://doh.pub/dns-query"
+    - "https://doh.360.cn/dns-query"
+    - "https://dns.adguard-dns.com/dns-query"
+    - ["https://doh.opendns.com/dns-query", "foreign", "OpenDNS DoH"]
+    - ["https://dns.google/dns-query", "foreign", Google DoH]
+    - ["https://cloudflare-dns.com/dns-query", "foreign", "CloudFlare DNS DoH"]
+    - ["https://101.101.101.101/dns-query", "foreign", "台湾 Quad 101 DoH"]
+
+# 上游 DNS 服务器组（主要用于实现分流查询），以 nameserver_group 开头
+nameserver_group_foreign:  # 海外 DNS 服务器组
+    - ["https://1.1.1.1/dns-query", "foreign", "Google DoH IP"]
+    - ["1.1.1.1", "foreign"]  # Google
+    - ["8.8.8.8", "foreign"]  # CloudFlare
+
+nameserver_group_tencent:
+    - 119.29.29.29
+    - https://doh.pub/dns-query  # IP: https://1.12.12.12/dns-query
+
+nameserver_group_baidu:
+    - 180.76.76.76
+
+nameserver_group_ali:
+    - 223.5.5.5
+    - https://dns.alidns.com/dns-query
+
+nameserver_group_360:
+    - 101.226.4.6  # 中国电信/铁通/移动
+    - 123.125.81.6  # 中国联通
+    - https://doh.360.cn/dns-query
+
+nameserver_group_114:
+    - 114.114.114.114
+
+# 域名组（主要用于实现分流查询），以 domain_group 开头
+domain_group_ali:
+    - alibaba.com
+    - taobao.com
+    - 1688.com
+    - etao.com
+    - cainiao.com
+    - aliyun.com
+    - alidns.com
+    - ele.me
+
+domain_group_tencent:
+    - tencent.com
+    - tencent.cn
+    - qq.com
+    - soso.com
+    - sogou.com
+    - tenpay.com
+
+domain_group_baidu:
+    - baidu.com
+
+domain_group_360:
+    - 360.net
+    - 360.cn
+    - 360.com
+    - qihoo.com
+    - so.com
+    - ludashi.com
+
+domain_group_foreign:
+    - google.com
+    - youtube.com
+    - github.com
+    - github.io
+    - githubusercontent.com
+    - stackoverflow.com
+    - yahoo.com
+    - amazon.com
+    - facebook.com
+    - twitter.com
+    - x.com
+    - instagram.com
+    - netflix.com
+    - pinterest.com
+    - quora.com
+    - reddit.com
+    - discord.com
+    - telegram.org
+    - ask.com
+    - duckduckgo.com
+    - full:wikipedia.org
+    - full:www.wikipedia.org
+    - python.org
+    - bitbucket.org
+    - gnome-look.org
+    - googleapis.com
+    - gitbook.com
+    - wordpress.com
+    - opendns.com
+    - cloudflare-dns.com
+    - dns.google
+    - v2ray.com
+    - v2fly.org
+    - v2ray.ws
+    - binance.com
+    - okx.com
+
 # 开启海外域名用海外 DNS 解析功能
 enable_foreign_resolve: true
-foreign_domains:
-    - "google.com"
-    - "youtube.com"
-    - "github.com"
-    - "github.io"
-    - "githubusercontent.com"
-    - "stackoverflow.com"
-    - "yahoo.com"
-    - "amazon.com"
-    - "facebook.com"
-    - "twitter.com"
-    - "x.com"
-    - "instagram.com"
-    - "netflix.com"
-    - "pinterest.com"
-    - "quora.com"
-    - "reddit.com"
-    - "discord.com"
-    - "telegram.org"
-    - "ask.com"
-    - "duckduckgo.com"
-    - "full:wikipedia.org"
-    - "full:www.wikipedia.org"
-    - "python.org"
-    - "bitbucket.org"
-    - "gnome-look.org"
-    - "googleapis.com"
-    - "gitbook.com"
-    - "wordpress.com"
-    - "opendns.com"
-    - "cloudflare-dns.com"
-    - "dns.google"
-    - "v2ray.com"
-    - "v2fly.org"
-    - "v2ray.ws"
-    - "binance.com"
-    - "okx.com"
+foreign_domains: domain_group_foreign
 
-# 服务监听地址
-server_listen: "127.0.0.1:53"
-
-# 服务器运行的进程优先级，值为 -20 到 19，仅 Unix 环境有效
-process_priority: 0
-
-# 日志相关配置
-loglevel: "info"
+# 开启分流查询
+enable_split_resolve: true
+split_resolve_map:
+    domain_group_baidu: nameserver_group_baidu
+    domain_group_tencent: nameserver_group_tencent
+    domain_group_ali: nameserver_group_ali
+    domain_group_360: nameserver_group_360
+    domain_group_foreign: nameserver_group_foreign
