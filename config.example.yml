@@ -94,6 +94,13 @@ domain_group_360:
     - so.com
     - ludashi.com
 
+domain_group_apple:
+    - apple.com
+    - apple.cn
+    - apple.com.cn
+    - apple-dns.net
+    - apple-cloudkit.com
+
 domain_group_foreign:
     - google.com
     - youtube.com
@@ -143,4 +150,5 @@ split_resolve_map:
     domain_group_tencent: nameserver_group_tencent
     domain_group_ali: nameserver_group_ali
     domain_group_360: nameserver_group_360
+    domain_group_apple: nameserver_group_tencent
     domain_group_foreign: nameserver_group_foreign
