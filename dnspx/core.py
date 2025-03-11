@@ -284,7 +284,7 @@ class DNSProxyServer(object):
                 self.socket_family
             )
             self._tcp_server_thread = threading.Thread(
-                 target=self._tcp_server.serve_forever
+                target=self._tcp_server.serve_forever
             )
             self._tcp_server_thread.daemon = True
             self._tcp_server_thread.start()
