@@ -50,6 +50,8 @@ from .error import (
 
 QTYPE_A = dns.rdatatype.A
 QTYPE_AAAA = dns.rdatatype.AAAA
+QTYPE_HTTPS = dns.rdatatype.HTTPS
+
 
 log = logging.getLogger(__name__)
 
@@ -547,7 +549,7 @@ class DNSResolver(object):
                     return amsg
 
             # 仅对 A, AAAA 类型的查询执行插件
-            if qmsg.qtype in {QTYPE_A, QTYPE_AAAA}:
+            if qmsg.qtype in {QTYPE_A, QTYPE_AAAA, QTYPE_HTTPS}:
                 amsg = self.run_plugins(qmsg)
 
         if not amsg:
