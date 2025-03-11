@@ -90,7 +90,7 @@ FOREIGN_QUERY_TIMEOUT = 0
 # 开启 DNS 缓存
 ENABLE_DNS_CACHE = True
 DNS_CACHE_SIZE = 512
-DNS_CACHE_TTL = 60 * 60 * 3  # 默认为 3 小时
+DNS_CACHE_TTL = 30  # 默认为 30 分钟
 
 # 开启本地 hosts 文件支持
 ENABLE_LOCAL_HOSTS = True

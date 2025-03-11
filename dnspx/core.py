@@ -305,7 +305,10 @@ class DNSProxyServer(object):
                 # 每十分钟清理一次缓存
                 if time.time() - last_evict_cache_time >= 600:
                     with suppress(Exception, logger=log, loglevel="warning"):
-                        self.dns_resolver.evict_cache()
+                        evicted_count = self.dns_resolver.evict_cache()
+                        remain_count = self.dns_resolver.query_cache.size
+                        log.debug("evict cache done, %s evicted, %s remained",
+                                  evicted_count, remain_count)
                         __import__("gc").collect()
                         last_evict_cache_time = time.time()
         except (SystemExit, Exception) as ex:
