@@ -306,7 +306,7 @@ class DNSProxyServer(object):
                 if time.time() - last_evict_cache_time >= 600:
                     with suppress(Exception, logger=log, loglevel="warning"):
                         evicted_count = self.dns_resolver.evict_cache()
-                        remain_count = self.dns_resolver.query_cache.size
+                        remain_count = self.dns_resolver.query_cache.size()
                         log.debug("evict cache done, %s evicted, %s remained",
                                   evicted_count, remain_count)
                         __import__("gc").collect()
