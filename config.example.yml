@@ -79,11 +79,22 @@ domain_group_ali:
     - ele.me
 
 domain_group_tencent:
+    - qq.com
+    - qmail.com
+    - weixin.com
     - tencent.com
     - tencent.cn
-    - qq.com
-    - soso.com
     - sogou.com
+    - weixinbridge.com
+    - tencent-cloud.net
+    - tencentcloud.com
+    - tencentsuite.com
+    - qpic.cn
+    - qlogo.cn
+    - idqqimg.com
+    - myqcloud.com
+    - wxworklive.com
+    - soso.com
     - tenpay.com
 
 domain_group_baidu:
