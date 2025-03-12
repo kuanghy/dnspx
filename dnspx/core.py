@@ -293,7 +293,7 @@ class DNSProxyServer(object):
 
         self._keep_running = True
 
-        last_evict_cache_time = 0
+        last_evict_cache_time = time.time()
         try:
             while True:
                 if not self._keep_running:
