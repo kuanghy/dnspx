@@ -271,7 +271,8 @@ class DNSProxyServer(object):
             self.socket_family,
         )
         self._udp_server_thread = threading.Thread(
-            target=self._udp_server.serve_forever
+            target=self._udp_server.serve_forever,
+            name="UDPServerThread",
         )
         self._udp_server_thread.daemon = True
         self._udp_server_thread.start()
@@ -284,7 +285,8 @@ class DNSProxyServer(object):
                 self.socket_family
             )
             self._tcp_server_thread = threading.Thread(
-                target=self._tcp_server.serve_forever
+                target=self._tcp_server.serve_forever,
+                name="TCPServerThread",
             )
             self._tcp_server_thread.daemon = True
             self._tcp_server_thread.start()
