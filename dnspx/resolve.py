@@ -51,6 +51,7 @@ from .error import (
 QTYPE_A = dns.rdatatype.A
 QTYPE_AAAA = dns.rdatatype.AAAA
 QTYPE_HTTPS = dns.rdatatype.HTTPS
+QTYPE_PTR = dns.rdatatype.PTR
 
 
 log = logging.getLogger(__name__)
@@ -533,12 +534,25 @@ class DNSResolver(object):
             return default
 
     def query(self, qmsg):
+        # Answer message
+        amsg = None
+
+        name = qmsg.qname_str
+
+        # DNS服务发现（DNS-Based Service Discovery, DNS-SD）
+        is_dns_sd = (
+            '._dns-sd._udp.' in name or '._dns-sd._tcp.' in name
+        )
+        # 如果是 PTR 和 DNS-SD 请求，则直接返回 NXDOMAIN
+        if qmsg.qtype == QTYPE_PTR or is_dns_sd:
+            amsg = dns.message.make_response(qmsg)
+            amsg.set_rcode(dns.rcode.NXDOMAIN)
+            amsg.flags |= dns.flags.RA
+            return amsg
+
         is_multi_question = qmsg.question_len > 1
         is_query_op = (qmsg.opcode() == dns.opcode.QUERY)
         enable_dns_cache = config.ENABLE_DNS_CACHE
-
-        # Answer message
-        amsg = None
 
         # 仅对单个请求，且是 Query 查询操作时，执行插件和缓存查询
         if not is_multi_question and is_query_op:
