@@ -253,18 +253,34 @@ def _parse_yaml_config_file(path):
         from yaml import Loader
 
     with open(path, encoding="utf-8") as fp:
-        _config = yaml.load(fp, Loader=Loader)
-    globals().update({key.upper(): val for key, val in _config.items()})
+        configs = yaml.load(fp, Loader=Loader)
+    return configs
 
 
 def _parse_config_file(path):
     _, fileext = _os.path.splitext(path)
     if fileext in {".yml", ".yaml"}:
-        _parse_yaml_config_file(path)
+        new_configs = _parse_yaml_config_file(path)
     else:
         with open(path, encoding="utf-8") as fp:
             code = compile(fp.read(), path, "exec")
-        exec(code, globals(), globals())
+        new_configs = {}
+        exec(code, new_configs, new_configs)
+    configs = globals()
+    for key, val in new_configs.items():
+        if key.startswith("_"):
+            continue
+        key = key.upper()
+        if key.startswith("DOMAIN_GROUP"):  # 域名组以追加的方式更新
+            if not isinstance(val, (list, tuple)):
+                raise ValueError('config item {key!r} must be a list')
+            configs.setdefault(key, []).extend(val)
+        elif key == "SPLIT_RESOLVE_MAP":  # 分流查询映射表以 update 的方式更新
+            if not isinstance(val, dict):
+                raise ValueError('config item {key!r} must be a dict')
+            configs[key].update({k.upper(): v.upper() for k, v in val.items()})
+        else:
+            configs[key] = val  # 其他配置直接替换更新
 
 
 def load_config(path=None, reset=False):
