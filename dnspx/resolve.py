@@ -29,6 +29,9 @@ import dns.rdataclass
 import dns.rrset
 import dns.rdtypes.IN.A
 import dns.rdtypes.IN.AAAA
+import dns.rdtypes.IN.HTTPS
+import dns.rdtypes.svcbbase as dns_svcb
+from dns.rdtypes.svcbbase import ParamKey as SVCBParamKey
 from dns.message import Message as DNSMessage, BadEDNS as BadEDNSMessage
 from dns.query import BadResponse as BadDNSResponse
 from dns.rdatatype import to_text as qtype2text
@@ -476,7 +479,7 @@ class DNSResolver(object):
             try:
                 ret = plugin(qmsg)
             except Exception:
-                log.exception("failed to run plugin {name!r}")
+                log.exception(f"failed to run plugin {name!r}")
                 continue
             if ret and not isinstance(ret, bool):
                 resp_msg = ret
@@ -676,6 +679,21 @@ class LocalHostsPlugin(object):
                 dns.rdataclass.IN,
                 QTYPE_AAAA,
                 host,
+            )
+        elif qmsg.qtype == QTYPE_HTTPS:
+            parmas = {
+                SVCBParamKey.ALPN: dns_svcb.ALPNParam([b'h2', b'h3'])
+            }
+            if ip_addr == 6:
+                parmas[SVCBParamKey.IPV6HINT] = dns_svcb.IPv4HintParam([host])
+            else:
+                parmas[SVCBParamKey.IPV4HINT] = dns_svcb.IPv4HintParam([host])
+            rd = dns.rdtypes.IN.HTTPS.HTTPS(
+                dns.rdataclass.IN,
+                QTYPE_HTTPS,
+                priority=1,
+                target='.',
+                params=parmas,
             )
         else:
             log.warning(f"Local query '{name}' host is IPv{ip_addr.version}, "
