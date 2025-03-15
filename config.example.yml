@@ -99,6 +99,10 @@ domain_group_tencent:
 
 domain_group_baidu:
     - baidu.com
+    - baidu-ads.com
+    - baiduads.com
+    - bdydns.cn
+    - dudns.com
 
 domain_group_360:
     - 360.net
