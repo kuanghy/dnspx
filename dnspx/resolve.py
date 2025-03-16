@@ -60,6 +60,23 @@ QTYPE_PTR = dns.rdatatype.PTR
 log = logging.getLogger(__name__)
 
 
+def add_attrs_to_qmsg(msg):
+    """为查询消息对象添加一些数据，方便后续处理
+
+    这里仅处理最后一个 question，对于多个 question 的消息无意义，因为
+    内置解析器只对有单个 question 的请求做特殊处理，如本地自定义域解析，缓存等，
+    对于有多个 question 的请求，内置解析器直接做转发处理
+    """
+    question = msg.question[-1]
+    msg.question_len = len(question)
+    msg.qname = question.name
+    msg.qname_s = question.name.to_text().strip('.')
+    msg.question_s = " & ".join(str(q) for q in msg.question)
+    msg.qtype = question.rdtype
+    msg.qclass = question.rdclass
+    return msg
+
+
 class NameServer(object):
 
     def __init__(self, address, type_="inland", comment=None, proxy=None):
@@ -151,8 +168,8 @@ class _BaseQuery(object):
             msg = dns.message.from_wire(wire)
         except (BadEDNSMessage) as e:
             if isinstance(self.qmsg, DNSMessage):
-                question_str = self.qmsg.question_str
-                warn_msg = (f"convert wire failed, question: {question_str}, "
+                question_s = self.qmsg.question_s
+                warn_msg = (f"convert wire failed, question: {question_s}, "
                             f"msg: {e}")
             else:
                 warn_msg = f"convert wire failed: {e}"
@@ -334,10 +351,10 @@ class _HTTPQuery(_BaseQuery):
 def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
     if proxyserver:
         log.debug(f"Use proxy '{proxyserver.geturl()}' for question "
-                  f"'{qmsg.question_str}'")
+                  f"'{qmsg.question_s}'")
     qsocket_type = qmsg.qsocket_type
     for nameserver in nameservers:
-        if qmsg.qname_str == nameserver.host:
+        if qmsg.qname_s == nameserver.host:
             continue
         if nameserver.proxy:
             _proxyserver = nameserver.proxy
@@ -371,10 +388,10 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
             _log = log.exception
             if isinstance(ex, (OSError, DNSTimeout, BadDNSResponse)):
                 _log = log.warning
-            _log(f"Proxy query [@{nameserver} {qmsg.id} {qmsg.question_str}] "
+            _log(f"Proxy query [@{nameserver} {qmsg.id} {qmsg.question_s}] "
                  f"failed: {ex}")
         else:
-            log.info(f"Proxy to {nameserver} [{qmsg.id} {qmsg.question_str}] "
+            log.info(f"Proxy to {nameserver} [{qmsg.id} {qmsg.question_s}] "
                      f"{(response_time * 1000):.2f} msec")
             break
     else:
@@ -527,11 +544,11 @@ class DNSResolver(object):
             random.choice(self._socks_proxies) if self._socks_proxies else None
         )
 
-    def query_from_cache(self, qmsg, default=b''):
-        data = self.get_cache(qmsg.qname_str, qmsg.qclass, qmsg.qtype)
+    def query_from_cache(self, qmsg, default=None):
+        data = self.get_cache(qmsg.qname_s, qmsg.qclass, qmsg.qtype)
         if data:
             data.id = qmsg.id
-            log.debug(f"Query [{qmsg.question_str}] cache is valid, use it")
+            log.debug(f"Query [{qmsg.question_s}] cache is valid, use it")
             return data
         else:
             return default
@@ -540,7 +557,7 @@ class DNSResolver(object):
         # Answer message
         amsg = None
 
-        name = qmsg.qname_str
+        name = qmsg.qname_s
 
         # DNS服务发现（DNS-Based Service Discovery, DNS-SD）
         is_dns_sd = (
@@ -576,7 +593,7 @@ class DNSResolver(object):
                 timeout=self.timeout
             )
         if enable_dns_cache and isinstance(amsg, DNSMessage):
-            self.set_cache(qmsg.qname_str, qmsg.qclass, qmsg.qtype, amsg)
+            self.set_cache(qmsg.qname_s, qmsg.qclass, qmsg.qtype, amsg)
         return amsg
 
 
@@ -656,7 +673,7 @@ class LocalHostsPlugin(object):
         return {**self.get_hosts_from_config(), **self._hosts}
 
     def __call__(self, qmsg):
-        name = qmsg.qname_str
+        name = qmsg.qname_s
         host = self.hosts.get(name)
         if not host:
             return True
@@ -777,7 +794,7 @@ class ForeignResolverPlugin(object):
         return False
 
     def __call__(self, qmsg):
-        name = qmsg.qname_str
+        name = qmsg.qname_s
         is_foreign = self.check_foreign_domain(name)
         if not is_foreign:
             return True
@@ -845,7 +862,7 @@ class SplitResolverPlugin(object):
         return False
 
     def __call__(self, qmsg):
-        name = qmsg.qname_str
+        name = qmsg.qname_s
         for domain_group, nameserver_group in self.split_resolve_map.items():
             if not self.match_domain(name, domain_group):
                 continue

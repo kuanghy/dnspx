@@ -21,7 +21,7 @@ from . import config
 from .version import __version__
 from .utils import cached_property, suppress, thread_sync, is_tty
 from .utils import is_main_thread
-from .resolve import DNSResolver
+from .resolve import DNSResolver, add_attrs_to_qmsg
 from .error import DNSTimeout, DNSUnreachableError
 
 
@@ -46,40 +46,37 @@ class DNSHandler(object):
         try:
             qmsg = dns.message.from_wire(message)
 
-            qmsg.qsocket_family = self.server.address_family  # IPv4 or IPv6
-            qmsg.qsocket_type = self.server.socket_type       # UDP or TCP
-
+            # NOTE:
             # 内置解析器只对有单个 question 的请求做特殊处理，如本地自定义域解析，缓存等
             # 对于有多个 question 的请求，内置解析器直接做转发处理
-            question = qmsg.question[-1]
-            qmsg.question_len = len(question)
-            qmsg.qname = question.name
-            qmsg.qname_str = question.name.to_text().strip('.')
-            qmsg.question_str = " & ".join(str(q) for q in qmsg.question)
-            qmsg.qtype = question.rdtype
-            qmsg.qclass = question.rdclass
+            add_attrs_to_qmsg(qmsg)
+
+            # XXX: 后续对这两个属性的依赖处理有问题，实际不需要，后续考虑去除
+            qmsg.qsocket_family = self.server.address_family  # IPv4 or IPv6
+            qmsg.qsocket_type = self.server.socket_type       # UDP or TCP
         except Exception as ex:
             log.error(f"Invalid DNS request from {client}, msg: {ex}")
             return response
 
-        log.info(f"From {client} [{qmsg.id} {qmsg.question_str}]")
+        log.info(f"From {client} [{qmsg.id} {qmsg.question_s}]")
+        resolver = self.server.dns_resolver
         try:
             if self.is_network_anomaly():
                 log.debug("Detected network anomaly, response using cache or "
                           "empty data")
-                amsg = self.server.dns_resolver.query_from_cache(qmsg)
+                amsg = resolver.query_from_cache(qmsg, default=b'')
             else:
-                amsg = self.server.dns_resolver.query(qmsg)
+                amsg = resolver.query(qmsg)
         except (DNSTimeout, DNSUnreachableError) as ex:
             if not self.server.check_nameservers(self.server.socket_type):
                 with thread_sync():
                     self.mark_network_anomaly(True)
                 log.info("Network is marked as anomaly")
-            amsg = self.server.dns_resolver.query_from_cache(qmsg)
-            log.warning(f"Query [{qmsg.question_str}] failed: {ex}")
+            amsg = resolver.query_from_cache(qmsg, default=b'')
+            log.warning(f"Query [{qmsg.question_s}] failed: {ex}")
         except Exception:
             amsg = b''
-            log.exception(f"Query [{qmsg.question_str}] failed")
+            log.exception(f"Query [{qmsg.question_s}] failed")
 
         response = amsg.to_wire() if isinstance(amsg, DNSMessage) else amsg
         return response
@@ -304,7 +301,7 @@ class DNSProxyServer(object):
 
                 time.sleep(3)
 
-                # 每十分钟清理一次缓存
+                # 每十分钟清理一次过期缓存
                 if time.time() - last_evict_cache_time >= 600:
                     with suppress(Exception, logger=log, loglevel="warning"):
                         evicted_count = self.dns_resolver.evict_cache()
