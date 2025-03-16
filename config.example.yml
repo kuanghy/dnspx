@@ -67,16 +67,17 @@ nameserver_group_114:
 
 # 域名组（主要用于实现分流查询），以 domain_group 开头
 domain_group_ali:
-    - alibaba.com
     - taobao.com
-    - 1688.com
-    - etao.com
-    - cainiao.com
     - aliyun.com
-    - aliyuncs.com
-    - alidns.com
-    - alibabadns.com
     - ele.me
+    - cainiao.com
+    - alidns.com
+    - 1688.com
+    - alikunlun.com
+    - alibaba.com
+    - etao.com
+    - aliyuncs.com
+    - alibabadns.com
 
 domain_group_tencent:
     - qq.com
