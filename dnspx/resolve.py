@@ -23,7 +23,9 @@ from urllib.request import (
 
 import dns.query
 import dns.message
+import dns.flags
 import dns.opcode
+import dns.rcode
 import dns.rdatatype
 import dns.rdataclass
 import dns.rrset
@@ -50,6 +52,9 @@ from .error import (
     PluginExistsError,
 )
 
+
+OPCODE_QUERY = dns.opcode.QUERY
+RCODE_NOERROR = dns.rcode.NOERROR
 
 QTYPE_A = dns.rdatatype.A
 QTYPE_AAAA = dns.rdatatype.AAAA
@@ -510,21 +515,17 @@ class DNSResolver(object):
         # 这里使用的 Cache 本身是线程安全的，操作时不必再加锁
         return Cache(maxsize=config.DNS_CACHE_SIZE, ttl=config.DNS_CACHE_TTL)
 
-    @staticmethod
-    def _get_cache_key(qname, qclass, qtype):
-        return f"{qname}_{qclass}_{qtype}"
-
     def _get_cache_ttl(self):
         return config.DNS_CACHE_TTL + round(random.uniform(1, 60), 2)
 
-    def set_cache(self, name, qclass, qtype, amsg):
-        key = self._get_cache_key(name, qclass, qtype)
-        ttl = self._get_cache_ttl() if amsg.answer else 60
+    def set_cache(self, name, qclass, qtype, amsg, ttl=None):
+        key = (name, qclass, qtype)
+        ttl = self._get_cache_ttl() if ttl is None else ttl
         self.query_cache.set(key, amsg, ttl=ttl)
         return True
 
     def get_cache(self, name, qclass, qtype):
-        key = self._get_cache_key(name, qclass, qtype)
+        key = (name, qclass, qtype)
         return self.query_cache.get(key)
 
     def clear_cache(self):
@@ -532,6 +533,44 @@ class DNSResolver(object):
 
     def evict_cache(self):
         return self.query_cache.evict()
+
+    def refresh_cache(self):
+        if not self.query_cache:
+            return
+        # 仅刷新最新使用的 1/3 缓存，但至少为 10 个
+        size = max(round(self.query_cache.size() / 3), 10)
+        keys = list(self.query_cache.keys())[-size:]
+        count = 0
+        for key in keys:
+            name, qclass, qtype = key
+            amsg = self.query_cache.get(key)
+            if not amsg:
+                continue
+            qmsg = dns.message.make_query(
+                name,
+                rdtype=qtype,
+                rdclass=qclass,
+                flags=dns.flags.RD
+            )
+            qmsg = add_attrs_to_qmsg(qmsg)
+            qmsg.qsocket_family = socket.AF_INET
+            qmsg.qsocket_type = socket.SOCK_DGRAM
+            self.query(qmsg, bypass_cache=True)
+
+            if config.ENABLE_DNS_CACHE and (qmsg.opcode() == OPCODE_QUERY):
+                if amsg.rcode() == RCODE_NOERROR:
+                    cache_ttl = 10
+                elif not amsg.answer:
+                    cache_ttl = 30
+                else:
+                    cache_ttl = None  # 由缓存设置时自动获取值
+                self.set_cache(
+                    qmsg.qname_s, qmsg.qclass, qmsg.qtype, amsg, cache_ttl
+                )
+
+            count += 1
+
+        log.debug("%s cache records were refreshed", count)
 
     @cached_property
     def _socks_proxies(self):
@@ -553,7 +592,7 @@ class DNSResolver(object):
         else:
             return default
 
-    def query(self, qmsg):
+    def query(self, qmsg, bypass_cache=False):
         # Answer message
         amsg = None
 
@@ -571,13 +610,12 @@ class DNSResolver(object):
             return amsg
 
         is_multi_question = qmsg.question_len > 1
-        is_query_op = (qmsg.opcode() == dns.opcode.QUERY)
-        enable_dns_cache = config.ENABLE_DNS_CACHE
+        is_query_op = (qmsg.opcode() == OPCODE_QUERY)  # 操作类型是否为标准查询
 
         # 仅对单个请求，且是 Query 查询操作时，执行插件和缓存查询
         if not is_multi_question and is_query_op:
             # 如果开启了缓存，则从缓存中查询到结果后直接返回
-            if enable_dns_cache:
+            if config.ENABLE_DNS_CACHE and not bypass_cache:
                 amsg = self.query_from_cache(qmsg)
                 if amsg:
                     return amsg
@@ -592,8 +630,7 @@ class DNSResolver(object):
                 proxyserver=self.proxyserver,
                 timeout=self.timeout
             )
-        if enable_dns_cache and isinstance(amsg, DNSMessage):
-            self.set_cache(qmsg.qname_s, qmsg.qclass, qmsg.qtype, amsg)
+
         return amsg
 
 
@@ -806,7 +843,7 @@ class ForeignResolverPlugin(object):
             )
         except Exception as ex:
             log.warning("failed to resolve [%s] using foreign nameservers: %s",
-                qmsg.question_str, ex
+                qmsg.question_s, ex
             )
             return True if isinstance(ex, DNSUnreachableError) else False
 
@@ -873,7 +910,7 @@ class SplitResolverPlugin(object):
                 return proxy_dns_query(qmsg, nameservers)
             except Exception as ex:
                 msg = "failed to resolve [%s] using %s: %s" % (
-                    qmsg.question_str, nameserver_group, ex
+                    qmsg.question_s, nameserver_group, ex
                 )
                 if isinstance(ex, DNSUnreachableError):
                     log.debug(msg)

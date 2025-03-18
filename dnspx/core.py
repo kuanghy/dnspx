@@ -17,11 +17,12 @@ from importlib import import_module
 import dns.message
 from dns.message import Message as DNSMessage
 
+
 from . import config
 from .version import __version__
 from .utils import cached_property, suppress, thread_sync, is_tty
 from .utils import is_main_thread
-from .resolve import DNSResolver, add_attrs_to_qmsg
+from .resolve import DNSResolver, add_attrs_to_qmsg, RCODE_NOERROR
 from .error import DNSTimeout, DNSUnreachableError
 
 
@@ -54,6 +55,7 @@ class DNSHandler(object):
             # XXX: 后续对这两个属性的依赖处理有问题，实际不需要，后续考虑去除
             qmsg.qsocket_family = self.server.address_family  # IPv4 or IPv6
             qmsg.qsocket_type = self.server.socket_type       # UDP or TCP
+            self.qmsg = qmsg
         except Exception as ex:
             log.error(f"Invalid DNS request from {client}, msg: {ex}")
             return response
@@ -67,6 +69,7 @@ class DNSHandler(object):
                 amsg = resolver.query_from_cache(qmsg, default=b'')
             else:
                 amsg = resolver.query(qmsg)
+            self.amsg = amsg
         except (DNSTimeout, DNSUnreachableError) as ex:
             if not self.server.check_nameservers(self.server.socket_type):
                 with thread_sync():
@@ -80,6 +83,25 @@ class DNSHandler(object):
 
         response = amsg.to_wire() if isinstance(amsg, DNSMessage) else amsg
         return response
+
+    def finish(self):
+        qmsg = getattr(self, "qmsg", None)
+        amsg = getattr(self, "amsg", None)
+        if isinstance(amsg, DNSMessage):
+            is_no_error = amsg.rcode() == RCODE_NOERROR
+            if not is_no_error:
+                log.warning("Query [{qmsg.question_s}] RCODE: %s", amsg.rcode())
+
+            if config.ENABLE_DNS_CACHE and (qmsg.opcode() == dns.opcode.QUERY):
+                if is_no_error:
+                    cache_ttl = 10
+                elif not amsg.answer:
+                    cache_ttl = 30
+                else:
+                    cache_ttl = None  # 由缓存设置时自动获取值
+                self.server.dns_resolver.set_cache(
+                    qmsg.qname_s, qmsg.qclass, qmsg.qtype, amsg, cache_ttl
+                )
 
 
 class UDPHandler(DNSHandler, socketserver.BaseRequestHandler):
@@ -301,9 +323,11 @@ class DNSProxyServer(object):
 
                 time.sleep(3)
 
-                # 每十分钟清理一次过期缓存
+                # 定时刷新缓存，并清理过期的缓存
                 if time.time() - last_evict_cache_time >= 600:
                     with suppress(Exception, logger=log, loglevel="warning"):
+                        if config.ENABLE_CACHE_REFRESH:
+                            self.dns_resolver.refresh_cache()
                         evicted_count = self.dns_resolver.evict_cache()
                         remain_count = self.dns_resolver.query_cache.size()
                         log.debug("evict cache done, %s evicted, %s remained",
