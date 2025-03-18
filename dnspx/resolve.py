@@ -787,9 +787,11 @@ class ForeignResolverPlugin(object):
             amsg = proxy_dns_query(
                 qmsg, self.nameservers, proxyserver=self.proxyserver,
             )
-        except Exception as e:
-            log.warning(f"Foreign nameservers resolve failed: {e}")
-            return False
+        except Exception as ex:
+            log.warning("failed to resolve [%s] using foreign nameservers: %s",
+                qmsg.question_str, ex
+            )
+            return True if isinstance(ex, DNSUnreachableError) else False
 
         return amsg
 
@@ -852,8 +854,15 @@ class SplitResolverPlugin(object):
             nameservers = self.grouped_nameservers[nameserver_group]
             try:
                 return proxy_dns_query(qmsg, nameservers)
-            except Exception as e:
-                log.warning(f"Foreign nameservers resolve failed: {e}")
-                return False
+            except Exception as ex:
+                msg = "failed to resolve [%s] using %s: %s" % (
+                    qmsg.question_str, nameserver_group, ex
+                )
+                if isinstance(ex, DNSUnreachableError):
+                    log.debug(msg)
+                    return True
+                else:
+                    log.warning(msg)
+                    return False
 
         return True
