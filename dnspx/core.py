@@ -41,6 +41,10 @@ class DNSHandler(object):
     def mark_network_anomaly(cls, state):
         cls.DETECTED_NETWORK_ANOMALY = state
 
+    def setup(self):
+        self.qmsg = None
+        self.amsg = None
+
     def parse(self, message):
         response = b''
         client = self.client_address[0]
@@ -85,23 +89,20 @@ class DNSHandler(object):
         return response
 
     def finish(self):
-        qmsg = getattr(self, "qmsg", None)
-        amsg = getattr(self, "amsg", None)
+        qmsg = self.qmsg
+        amsg = self.amsg
         if isinstance(amsg, DNSMessage):
             is_no_error = amsg.rcode() == RCODE_NOERROR
             if not is_no_error:
                 log.warning("Query [{qmsg.question_s}] RCODE: %s", amsg.rcode())
 
-            if config.ENABLE_DNS_CACHE and (qmsg.opcode() == dns.opcode.QUERY):
-                if is_no_error:
-                    cache_ttl = 10
-                elif not amsg.answer:
-                    cache_ttl = 30
-                else:
-                    cache_ttl = None  # 由缓存设置时自动获取值
-                self.server.dns_resolver.set_cache(
-                    qmsg.qname_s, qmsg.qclass, qmsg.qtype, amsg, cache_ttl
-                )
+            resolver = self.server.dns_resolver
+            if (
+                config.ENABLE_DNS_CACHE
+                and qmsg.is_query_op
+                and not resolver.has_cache(qmsg)
+            ):
+                resolver.set_cache(qmsg, amsg)
 
 
 class UDPHandler(DNSHandler, socketserver.BaseRequestHandler):

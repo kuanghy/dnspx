@@ -79,6 +79,8 @@ def add_attrs_to_qmsg(msg):
     msg.question_s = " & ".join(str(q) for q in msg.question)
     msg.qtype = question.rdtype
     msg.qclass = question.rdclass
+    msg.is_multi_question = len(question) > 1
+    msg.is_query_op = (msg.opcode() == OPCODE_QUERY)  # 操作类型是否为标准查询
     return msg
 
 
@@ -518,15 +520,25 @@ class DNSResolver(object):
     def _get_cache_ttl(self):
         return config.DNS_CACHE_TTL + round(random.uniform(1, 60), 2)
 
-    def set_cache(self, name, qclass, qtype, amsg, ttl=None):
-        key = (name, qclass, qtype)
-        ttl = self._get_cache_ttl() if ttl is None else ttl
+    def set_cache(self, qmsg, amsg, ttl=None):
+        key = (qmsg.qname_s, qmsg.qclass, qmsg.qtype)
+        if ttl is None:
+            if amsg.rcode() != RCODE_NOERROR:
+                ttl = 10
+            elif not amsg.answer:
+                ttl = 30
+            else:
+                ttl = self._get_cache_ttl()
         self.query_cache.set(key, amsg, ttl=ttl)
         return True
 
-    def get_cache(self, name, qclass, qtype):
-        key = (name, qclass, qtype)
+    def get_cache(self, qmsg):
+        key = (qmsg.qname_s, qmsg.qclass, qmsg.qtype)
         return self.query_cache.get(key)
+
+    def has_cache(self, qmsg):
+        key = (qmsg.qname_s, qmsg.qclass, qmsg.qtype)
+        return self.query_cache.has(key)
 
     def clear_cache(self):
         return self.query_cache.clear()
@@ -557,16 +569,8 @@ class DNSResolver(object):
             qmsg.qsocket_type = socket.SOCK_DGRAM
             self.query(qmsg, bypass_cache=True)
 
-            if config.ENABLE_DNS_CACHE and (qmsg.opcode() == OPCODE_QUERY):
-                if amsg.rcode() == RCODE_NOERROR:
-                    cache_ttl = 10
-                elif not amsg.answer:
-                    cache_ttl = 30
-                else:
-                    cache_ttl = None  # 由缓存设置时自动获取值
-                self.set_cache(
-                    qmsg.qname_s, qmsg.qclass, qmsg.qtype, amsg, cache_ttl
-                )
+            if config.ENABLE_DNS_CACHE and qmsg.is_query_op:
+                self.set_cache(qmsg, amsg)
 
             count += 1
 
@@ -584,7 +588,7 @@ class DNSResolver(object):
         )
 
     def query_from_cache(self, qmsg, default=None):
-        data = self.get_cache(qmsg.qname_s, qmsg.qclass, qmsg.qtype)
+        data = self.get_cache(qmsg)
         if data:
             data.id = qmsg.id
             log.debug(f"Query [{qmsg.question_s}] cache is valid, use it")
@@ -609,11 +613,8 @@ class DNSResolver(object):
             amsg.flags |= dns.flags.RA
             return amsg
 
-        is_multi_question = qmsg.question_len > 1
-        is_query_op = (qmsg.opcode() == OPCODE_QUERY)  # 操作类型是否为标准查询
-
         # 仅对单个请求，且是 Query 查询操作时，执行插件和缓存查询
-        if not is_multi_question and is_query_op:
+        if not qmsg.is_multi_question and qmsg.is_query_op:
             # 如果开启了缓存，则从缓存中查询到结果后直接返回
             if config.ENABLE_DNS_CACHE and not bypass_cache:
                 amsg = self.query_from_cache(qmsg)
