@@ -65,8 +65,8 @@ QTYPE_PTR = dns.rdatatype.PTR
 log = logging.getLogger(__name__)
 
 
-def add_attrs_to_qmsg(msg):
-    """为查询消息对象添加一些数据，方便后续处理
+def patch_qmsg_attrs(msg):
+    """为查询消息对象添加一些属性，方便后续处理
 
     这里仅处理最后一个 question，对于多个 question 的消息无意义，因为
     内置解析器只对有单个 question 的请求做特殊处理，如本地自定义域解析，缓存等，
@@ -80,7 +80,18 @@ def add_attrs_to_qmsg(msg):
     msg.qtype = question.rdtype
     msg.qclass = question.rdclass
     msg.is_multi_question = len(question) > 1
-    msg.is_query_op = (msg.opcode() == OPCODE_QUERY)  # 操作类型是否为标准查询
+
+    # 操作类型是否为标准查询
+    msg.is_query_op = (msg.opcode() == OPCODE_QUERY)
+
+    # 查询类型是否为 PTR
+    msg.is_qtype_ptr = msg.qtype == QTYPE_PTR
+
+    # DNS服务发现（DNS-Based Service Discovery, DNS-SD）
+    msg.is_dns_sd = (
+        '._dns-sd._udp.' in msg.qname_s or '._dns-sd._tcp.' in msg.qname_s
+    )
+
     return msg
 
 
@@ -564,7 +575,7 @@ class DNSResolver(object):
                 rdclass=qclass,
                 flags=dns.flags.RD
             )
-            qmsg = add_attrs_to_qmsg(qmsg)
+            qmsg = patch_qmsg_attrs(qmsg)
             qmsg.qsocket_family = socket.AF_INET
             qmsg.qsocket_type = socket.SOCK_DGRAM
             self.query(qmsg, bypass_cache=True)
@@ -600,14 +611,8 @@ class DNSResolver(object):
         # Answer message
         amsg = None
 
-        name = qmsg.qname_s
-
-        # DNS服务发现（DNS-Based Service Discovery, DNS-SD）
-        is_dns_sd = (
-            '._dns-sd._udp.' in name or '._dns-sd._tcp.' in name
-        )
         # 如果是 PTR 和 DNS-SD 请求，则直接返回 NXDOMAIN
-        if qmsg.qtype == QTYPE_PTR or is_dns_sd:
+        if qmsg.is_qtype_ptr or qmsg.is_dns_sd:
             amsg = dns.message.make_response(qmsg)
             amsg.set_rcode(dns.rcode.NXDOMAIN)
             amsg.flags |= dns.flags.RA

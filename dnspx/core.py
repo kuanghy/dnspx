@@ -22,7 +22,7 @@ from . import config
 from .version import __version__
 from .utils import cached_property, suppress, thread_sync, is_tty
 from .utils import is_main_thread
-from .resolve import DNSResolver, add_attrs_to_qmsg, RCODE_NOERROR
+from .resolve import DNSResolver, patch_qmsg_attrs, RCODE_NOERROR
 from .error import DNSTimeout, DNSUnreachableError
 
 
@@ -54,7 +54,7 @@ class DNSHandler(object):
             # NOTE:
             # 内置解析器只对有单个 question 的请求做特殊处理，如本地自定义域解析，缓存等
             # 对于有多个 question 的请求，内置解析器直接做转发处理
-            add_attrs_to_qmsg(qmsg)
+            patch_qmsg_attrs(qmsg)
 
             # XXX: 后续对这两个属性的依赖处理有问题，实际不需要，后续考虑去除
             qmsg.qsocket_family = self.server.address_family  # IPv4 or IPv6
@@ -92,9 +92,10 @@ class DNSHandler(object):
         qmsg = self.qmsg
         amsg = self.amsg
         if isinstance(amsg, DNSMessage):
-            is_no_error = amsg.rcode() == RCODE_NOERROR
-            if not is_no_error:
-                log.warning("Query [{qmsg.question_s}] RCODE: %s", amsg.rcode())
+            rcode = amsg.rcode()
+            is_no_error = rcode == RCODE_NOERROR
+            if not is_no_error and not qmsg.is_qtype_ptr and not qmsg.is_dns_sd:
+                log.warning("Query [%s] RCODE: %s", qmsg.question_s, rcode)
 
             resolver = self.server.dns_resolver
             if (
