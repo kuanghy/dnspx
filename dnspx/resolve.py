@@ -560,8 +560,8 @@ class DNSResolver(object):
     def refresh_cache(self):
         if not self.query_cache:
             return
-        # 仅刷新最新使用的 1/3 缓存，但至少为 10 个
-        size = max(round(self.query_cache.size() / 3), 10)
+        # 仅刷新最新使用的 2/3 缓存，但至少为 10 个
+        size = max(round(self.query_cache.size() * (2 / 3)), 10)
         keys = list(self.query_cache.keys())[-size:]
         count = 0
         for key in keys:
