@@ -82,8 +82,11 @@ domain_group_tencent:
     - qq.com
     - qmail.com
     - weixin.com
+    - doh.pub
+    - dot.pub
     - tencent.com
     - tencent.cn
+    - dnspod.cn
     - sogou.com
     - weixinbridge.com
     - tencent-cloud.net
