@@ -157,8 +157,8 @@ domain_group_foreign:
     - binance.com
     - okx.com
 
-# 开启海外域名用海外 DNS 解析功能
-enable_foreign_resolve: true
+# 开启海外域名用海外 DNS 解析功能（该功能已经废弃，建议使用分流查询）
+enable_foreign_resolve: false
 foreign_domains: domain_group_foreign
 
 # 开启分流查询

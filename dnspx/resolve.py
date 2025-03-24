@@ -472,7 +472,7 @@ class DNSResolver(object):
             self._mount_plugin(
                 plugins, "local_hosts", LocalHostsPlugin()
             )
-        if config.ENABLE_FOREIGN_RESOLVER:
+        if config.ENABLE_FOREIGN_RESOLVE:
             # 先尝试用海外域名服务器解析，海外域名服务器均失败后再尝试国内的域名服务器
             nameservers = self.foreign_nameservers + self.inland_nameservers
             self._mount_plugin(
@@ -795,8 +795,8 @@ class ForeignResolverPlugin(object):
         if not config.FOREIGN_DOMAINS:
             foreign_domain_patterns = []
         elif isinstance(config.FOREIGN_DOMAINS, str):
-            domain_group = config.FOREIGN_DOMAINS
-            if domain_group.startswith("domain_group"):
+            domain_group = config.FOREIGN_DOMAINS.upper()
+            if not domain_group.startswith("DOMAIN_GROUP"):
                 raise ValueError("invalid config FOREIGN_DOMAINS")
             foreign_domain_patterns = getattr(config, domain_group.upper())
         elif isinstance(config.FOREIGN_DOMAINS, (list, tuple, set)):

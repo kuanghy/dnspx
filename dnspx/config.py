@@ -98,7 +98,7 @@ ENABLE_LOCAL_HOSTS = True
 LOCAL_HOSTS_PATH = None  # 本地 hosts 文件路径，可以为目录或者单个文件
 
 # 开启海外域名用海外 DNS 解析功能
-ENABLE_FOREIGN_RESOLVER = False
+ENABLE_FOREIGN_RESOLVE = False
 FOREIGN_DOMAINS = [  # 标记海外域名，以用海外的 DNS 解析
     "google.com",
     "youtube.com",
