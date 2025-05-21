@@ -121,6 +121,9 @@ domain_group_apple:
     - apple.com.cn
     - apple-dns.net
     - apple-cloudkit.com
+    - icloud.com
+    - aaplimg.com
+    - mzstatic.com
 
 domain_group_foreign:
     - google.com
