@@ -69,14 +69,54 @@ domain_group_ali:
     - taobao.com
     - aliyun.com
     - ele.me
-    - cainiao.com
     - alidns.com
+    - alipay.com
+    - alipayplus.com
+    - cainiao.com
     - 1688.com
     - alikunlun.com
     - alibaba.com
     - etao.com
+    - taobaocdn.com
+    - tb.cn
+    - tbcache.com
+    - tbcdn.cn
+    - tmall.com
     - aliyuncs.com
     - alibabadns.com
+    - alicdn.com
+    - alicloudapi.com
+    - aliyuncdn.com
+    - aliyuncdn.net
+    - aliyunfile.com
+    - aliyunpds.com
+    # 蚂蚁集团
+    - antfin.com
+    # 夸克
+    - cueme.cn
+    - quark.cn
+    # 飞猪
+    - alitrip.com
+    - feizhu.cn
+    - feizhu.com
+    - fliggy.com
+    - iuynfg.com
+    # 高德
+    - amap.com
+    # 虾米音乐
+    - xiami.com
+    - xiami.net
+    # 闲鱼
+    - goofish.com
+    # 考拉
+    - kaola.com
+    # 盒马
+    - freshhema.com
+    - freshippo.com
+    - hemamax.com
+    - hemaos.com
+    - hemashare.cn
+    - shyhhema.com
 
 domain_group_tencent:
     - qq.com
@@ -124,10 +164,80 @@ domain_group_apple:
     - icloud.com
     - aaplimg.com
     - mzstatic.com
+    - apple-icloud.cn
+    - appleicloud.cn
+    - applemx-icloud.com
+    - icloud-apple.cn
+    - icloud-content.com
+    - icloud-isupport.com
+    - icloud-sandbox.com
+    - icloud.com
+    - icloud.com.cn
+    - aplestore.com
+    - applestore.cm
+    - applestore.cn
+    - apple-store.cn
+    - apple-store.net
+    - onlineapplestore.com
+    - apple-imac.com
+    - appleimac.com
+    - imac-apple.com
+    - imac-applecomputer.com
+    - imac.com
+    - imacapple.com
+    - imacapplecomputer.com
+    - ebookforipad.com
+    - euroipad.com
+    - findmyipad.com
+    - indiaipad.com
+    - ipadaustralia.com
+    - ipadmini.cm
+    - ipadpro.buzz
+    - ukipad.com
+    - appledarwin.com
+    - appledarwin.net
+    - darwinsource.com
+    - darwinsource.org
+    - darwinsourcecode.com
+    - appleaccount.net
+    - appleid-applemx.com
+    - appleid-iclou.com
+    - appleid.berlin
+    - appleid.com
+    - appleid.hamburg
+    - appleid.hk
+    - ids-apple.com
+    - myappleid.com
 
-domain_group_foreign:
+domain_group_google:
     - google.com
     - youtube.com
+    - dns.google
+    - googleearth.com
+    - googlefiber.com
+    - googlefiber.net
+    - googlefinland.com
+    - googlemail.com
+    - googlemaps.com
+    - googlepagecreator.com
+    - googlephotos.com
+    - googleplus.com
+    - googlesource.com
+    - googlestore.com
+    - googlesverige.com
+    - googleusercontent.com
+    - googleventures.com
+    - googlezip.net
+    - gstatic.com
+    - gsuite.com
+    - googleplay.com
+    - play-fe.googleapis.com
+    - play-games.googleusercontent.com
+    - play-lh.googleusercontent.com
+    - play.google.com
+    - play.googleapis.com
+
+domain_group_foreign:
     - github.com
     - github.io
     - githubusercontent.com
@@ -156,7 +266,6 @@ domain_group_foreign:
     - wordpress.com
     - opendns.com
     - cloudflare-dns.com
-    - dns.google
     - v2ray.com
     - v2fly.org
     - v2ray.ws
@@ -175,4 +284,5 @@ split_resolve_map:
     domain_group_ali: nameserver_group_ali
     domain_group_360: nameserver_group_360
     domain_group_apple: nameserver_group_tencent
+    domain_group_google: nameserver_group_foreign
     domain_group_foreign: nameserver_group_foreign
