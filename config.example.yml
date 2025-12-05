@@ -24,9 +24,9 @@ local_hosts_path: null
 
 # 上游公共 DNS 服务器
 nameservers:
+    - "114.114.114.114"
     - "119.29.29.29"
     - "223.5.5.5"
-    - "114.114.114.114"
     - ["1.1.1.1", "foreign", "CloudFlare DNS，号称全球最快的 DNS 服务"]
     - ["8.8.8.8", "foreign", "Google Public DNS"]
     - ["208.67.222.222", "foreign", "OpenDNS"]
@@ -63,6 +63,9 @@ nameserver_group_360:
 
 nameserver_group_114:
     - 114.114.114.114
+
+nameserver_group_cnnic:  # 中国互联网络信息中心
+    - 1.2.4.8
 
 # 域名组（主要用于实现分流查询），以 domain_group 开头
 domain_group_ali:
