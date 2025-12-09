@@ -95,7 +95,7 @@ class DNSHandler(object):
             rcode = amsg.rcode()
             is_no_error = rcode == RCODE_NOERROR
             if not is_no_error and not qmsg.is_qtype_ptr and not qmsg.is_dns_sd:
-                log.warning("Query [%s] RCODE: %s", qmsg.question_s, rcode)
+                log.debug("Query [%s] RCODE: %s", qmsg.question_s, rcode)
 
             resolver = self.server.dns_resolver
             if (
