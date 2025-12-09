@@ -240,6 +240,16 @@ domain_group_google:
     - play.google.com
     - play.googleapis.com
 
+domain_group_telegram:
+    - telegram.org
+    - t.me
+    - telegram.me
+    - telegram.dog
+    - telegram.space
+    - tg.dev
+    - tx.me
+    - tdesktop.com
+
 domain_group_foreign:
     - github.com
     - github.io
@@ -256,7 +266,6 @@ domain_group_foreign:
     - quora.com
     - reddit.com
     - discord.com
-    - telegram.org
     - ask.com
     - duckduckgo.com
     - full:wikipedia.org
@@ -288,4 +297,5 @@ split_resolve_map:
     domain_group_360: nameserver_group_360
     domain_group_apple: nameserver_group_tencent
     domain_group_google: nameserver_group_foreign
+    domain_group_telegram: nameserver_group_foreign
     domain_group_foreign: nameserver_group_foreign
