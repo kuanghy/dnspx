@@ -64,7 +64,7 @@ class DNSHandler(object):
             log.error(f"Invalid DNS request from {client}, msg: {ex}")
             return response
 
-        log.info(f"From {client} [{qmsg.id} {qmsg.question_s}]")
+        log.info(f"[{qmsg.id} {qmsg.question_s}] from {client}")
         resolver = self.server.dns_resolver
         try:
             if self.is_network_anomaly():
@@ -78,12 +78,12 @@ class DNSHandler(object):
             if not self.server.check_nameservers(self.server.socket_type):
                 with thread_sync():
                     self.mark_network_anomaly(True)
-                log.info("Network is marked as anomaly")
+                log.warning("Network is marked as anomaly")
             amsg = resolver.query_from_cache(qmsg, default=b'')
-            log.warning(f"Query [{qmsg.question_s}] failed: {ex}")
+            log.warning(f"[{qmsg.id} {qmsg.question_s}] query failed: {ex}")
         except Exception:
             amsg = b''
-            log.exception(f"Query [{qmsg.question_s}] failed")
+            log.exception(f"[{qmsg.id} {qmsg.question_s}] query failed")
 
         response = amsg.to_wire() if isinstance(amsg, DNSMessage) else amsg
         return response
@@ -95,7 +95,7 @@ class DNSHandler(object):
             rcode = amsg.rcode()
             is_no_error = rcode == RCODE_NOERROR
             if not is_no_error and not qmsg.is_qtype_ptr and not qmsg.is_dns_sd:
-                log.debug("Query [%s] RCODE: %s", qmsg.question_s, rcode)
+                log.debug("[%s %s] RCODE: %s", qmsg.id, qmsg.question_s, rcode)
 
             resolver = self.server.dns_resolver
             if (

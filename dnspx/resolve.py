@@ -406,11 +406,10 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
             _log = log.exception
             if isinstance(ex, (OSError, DNSTimeout, BadDNSResponse)):
                 _log = log.warning
-            _log(f"Proxy query [@{nameserver} {qmsg.id} {qmsg.question_s}] "
-                 f"failed: {ex}")
+            _log(f"[{qmsg.id} {qmsg.question_s}] proxy to {nameserver} failed: {ex}")
         else:
-            log.info(f"Proxy to {nameserver} [{qmsg.id} {qmsg.question_s}] "
-                     f"{(response_time * 1000):.2f} msec")
+            log.info(f"[{qmsg.id} {qmsg.question_s}] proxy to {nameserver} "
+                     f"[{(response_time * 1000):.2f}ms]")
             break
     else:
         raise DNSUnreachableError("no servers could be reached")
