@@ -213,8 +213,8 @@ class DNSProxyServer(object):
         log.info("Query timeout: %s, foreign query timeout: %s",
                  timeout, config.FOREIGN_QUERY_TIMEOUT)
         resolver = DNSResolver(self.nameservers, timeout=timeout)
-        pugins = resolver.plugins
-        hosts_plugin = pugins.get("local_hosts")
+        plugins = resolver.plugins
+        hosts_plugin = plugins.get("local_hosts")
         if hosts_plugin:
             if self.hosts_path:
                 config_paths = hosts_plugin.fetch_config_files(self.hosts_path)

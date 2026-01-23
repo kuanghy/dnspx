@@ -348,7 +348,7 @@ class _HTTPQuery(_BaseQuery):
         req.add_header("Content-Type", "application/dns-message")
         with self._opener.open(req, timeout=self.timeout) as resp:
             if resp.status != 200:
-                raise
+                raise OSError(f"DoH request failed with status {resp.status}")
             self.adata = resp.read()
         return self.adata
 
