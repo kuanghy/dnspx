@@ -184,7 +184,7 @@ class _BaseQuery(object):
         """转换报文数据包到 DNSMessage，如果转换失败则直接返回数据包"""
         try:
             msg = dns.message.from_wire(wire)
-        except (BadEDNSMessage) as e:
+        except BadEDNSMessage as e:
             if isinstance(self.qmsg, DNSMessage):
                 question_s = self.qmsg.question_s
                 warn_msg = (f"convert wire failed, question: {question_s}, "
@@ -261,9 +261,9 @@ class _UDPQuery(_BaseQuery):
     def send_msg(self, expiration=None):
         sock = self.get_sock()
         self._wait_for_writable(sock, expiration)
+        sock.sendall(self.qdata)
         sent_time = time.time()
-        length = sock.sendall(self.qdata)
-        return length, sent_time
+        return len(self.qdata), sent_time
 
     def receive_msg(self, expiration=None):
         sock = self.get_sock()
@@ -337,8 +337,9 @@ class _HTTPQuery(_BaseQuery):
             )
             opener = build_http_opener(socks_handler)
         else:
+            proxy_url = self.proxyserver.geturl()
             proxy_handler = HTTPProxyHandler({
-                'http': self.proxyserver, 'https': self.proxyserver
+                'http': proxy_url, 'https': proxy_url
             })
             opener = build_http_opener(proxy_handler)
         return opener
@@ -577,7 +578,12 @@ class DNSResolver(object):
             qmsg = patch_qmsg_attrs(qmsg)
             qmsg.qsocket_family = socket.AF_INET
             qmsg.qsocket_type = socket.SOCK_DGRAM
-            new_amsg = self.query(qmsg, bypass_cache=True)
+            try:
+                new_amsg = self.query(qmsg, bypass_cache=True)
+            except Exception as ex:
+                log.warning("Failed to refresh cache for [%s]: %s",
+                            qmsg.question_s, ex)
+                continue
 
             if config.ENABLE_DNS_CACHE and qmsg.is_query_op:
                 self.set_cache(qmsg, new_amsg)
@@ -772,8 +778,8 @@ class ForeignResolverPlugin(object):
 
     def __init__(self, nameservers=None):
         self.nameservers = nameservers or [
-            ("8.8.8.8", 53),  # Google Public DNS
-            ("1.1.1.1", 53),  # CloudFlare DNS
+            ("8.8.8.8", "foreign", "Google Public DNS"),
+            ("1.1.1.1", "foreign", "CloudFlare DNS"),
         ]
 
     @cached_property

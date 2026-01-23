@@ -325,6 +325,10 @@ def setup_logging(reset=False, enable_rotate_log=False,
 
     # 添加以时间自动轮转的文件日志处理器
     if enable_time_rotate_log and time_rotate_log_file:
+        # 确保日志目录存在
+        log_dir = os.path.dirname(time_rotate_log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
         file_handler = TimedRotatingFileHandler(
             time_rotate_log_file,
             when='D',
@@ -346,7 +350,7 @@ def setup_logging(reset=False, enable_rotate_log=False,
     if enable_smtp_log and config.EMAIL_TOADDRS:
         params = dict(
             mailhost=config.EMAIL_HOST,
-            fromaddr="JQFactorBaseErrorMonitor<{}>".format(config.EMAIL_ADDR),
+            fromaddr="DNSPXErrorMonitor<{}>".format(config.EMAIL_ADDR),
             toaddrs=config.EMAIL_TOADDRS,
             subject=None,
             credentials=(config.EMAIL_ADDR, config.EMAIL_PASSWD)

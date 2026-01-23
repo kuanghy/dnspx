@@ -30,7 +30,10 @@ class DNSPXWinService(win32serviceutil.ServiceFramework):
         self._logger = log.getChild(__name__)
 
         config = load_config()
-        server_address = tuple(parse_ip_port(config.SERVER_LISTEN))
+        ip, port = parse_ip_port(config.SERVER_LISTEN)
+        if port is None:
+            port = 53
+        server_address = (ip, port)
         self._dns_proxy_server = DNSProxyServer(
             server_address,
             enable_tcp=False,

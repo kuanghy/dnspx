@@ -163,7 +163,9 @@ class BaseSocketServer(socketserver.ThreadingMixIn):
         if config.MAX_THREAD_NUM > 0 and thread_count >= config.MAX_THREAD_NUM:
             log.warning("Too many threads, current number of threads: %s",
                         thread_count)
-            self.socket.sendto(b'', client_address)
+            # UDP 返回空响应，TCP 直接忽略（连接会被关闭）
+            if self.socket_type == socket.SOCK_DGRAM:
+                self.socket.sendto(b'', client_address)
             return
         if self.is_network_anomaly() and self.check_nameservers():
             with thread_sync():

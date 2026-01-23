@@ -65,9 +65,9 @@ NAMESERVERS = DEFAULT_NAMESERVERS = [
 
 # 上游 DNS 服务器组（主要用于实现分流查询），以 NAMESERVER_GROUP 开头
 NAMESERVER_GROUP_FOREIGN = [  # 海外 DNS 服务器组
-    "1.1.1.1",  # Google
-    "8.8.8.8",  # Cloudflare
-    "https://1.1.1.1/dns-query",  # Google DoH
+    "1.1.1.1",  # CloudFlare
+    "8.8.8.8",  # Google
+    "https://1.1.1.1/dns-query",  # CloudFlare DoH
 ]
 NAMESERVER_GROUP_ALI = []
 NAMESERVER_GROUP_TENCENT = []
@@ -274,11 +274,11 @@ def _parse_config_file(path):
         key = key.upper()
         if key.startswith("DOMAIN_GROUP"):  # 域名组以追加的方式更新
             if not isinstance(val, (list, tuple)):
-                raise ValueError('config item {key!r} must be a list')
+                raise ValueError(f'config item {key!r} must be a list')
             configs.setdefault(key, []).extend(val)
         elif key == "SPLIT_RESOLVE_MAP":  # 分流查询映射表以 update 的方式更新
             if not isinstance(val, dict):
-                raise ValueError('config item {key!r} must be a dict')
+                raise ValueError(f'config item {key!r} must be a dict')
             configs[key].update({k.upper(): v.upper() for k, v in val.items()})
         else:
             configs[key] = val  # 其他配置直接替换更新
@@ -300,7 +300,7 @@ def load_config(path=None, reset=False):
         elif "__compiled__" in globals():
             # nuitka 打包的情况
             try:
-                APP_PATH = _os.path.dirname(__compiled__.original_argv0)  # noqa
+                APP_PATH = _os.path.dirname(__compiled__.original_argv0)  # noqa # pyright: ignore
             except Exception:
                 try:
                     APP_PATH = _os.path.dirname(_os.path.dirname(__file__))
