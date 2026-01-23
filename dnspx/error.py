@@ -35,4 +35,4 @@ class DNSUnreachableError(DNSError):
 
 
 class PluginExistsError(Error):
-    """The plugin not exists"""
+    """The plugin already exists"""

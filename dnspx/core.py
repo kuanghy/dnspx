@@ -119,10 +119,24 @@ class UDPHandler(DNSHandler, socketserver.BaseRequestHandler):
 class TCPHandler(DNSHandler, socketserver.BaseRequestHandler):
 
     def handle(self):
-        data = self.request.recv(1024)
+        # 在 TCP DNS 协议中，前两个字节用于存储消息的长度
+        length_data = self.request.recv(2)
+        if len(length_data) < 2:
+            log.warning("TCP request length data incomplete, received %d bytes",
+                        len(length_data))
 
-        # 在 TCP DNS 协议中，前两个字节用于存储响应的长度
-        data = data[2:]
+        msg_length = int.from_bytes(length_data, byteorder='big') if length_data else 0
+        data = b''
+        while len(data) < msg_length:
+            chunk = self.request.recv(msg_length - len(data))
+            if not chunk:
+                break
+            data += chunk
+
+        if len(data) < msg_length:
+            log.warning("TCP request data incomplete, expected %d bytes but "
+                        "received %d bytes", msg_length, len(data))
+
         response = self.parse(data)
 
         if response:

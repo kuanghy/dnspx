@@ -65,9 +65,9 @@ NAMESERVERS = DEFAULT_NAMESERVERS = [
 
 # 上游 DNS 服务器组（主要用于实现分流查询），以 NAMESERVER_GROUP 开头
 NAMESERVER_GROUP_FOREIGN = [  # 海外 DNS 服务器组
-    "1.1.1.1"  # Google
-    "8.8.8.8"  # Cloudflare
-    "https://1.1.1.1/dns-query"  # Google DoH
+    "1.1.1.1",  # Google
+    "8.8.8.8",  # Cloudflare
+    "https://1.1.1.1/dns-query",  # Google DoH
 ]
 NAMESERVER_GROUP_ALI = []
 NAMESERVER_GROUP_TENCENT = []
@@ -333,6 +333,7 @@ def load_config(path=None, reset=False):
             continue
         _log.debug("Load config: %s", cfg_path)
         _parse_config_file(cfg_path)
+        loaded_config_paths.append(cfg_path)
 
     _LOADED_CONFIG_PATHS = loaded_config_paths
     _HAS_BEEN_LOADED = True

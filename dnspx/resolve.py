@@ -79,7 +79,7 @@ def patch_qmsg_attrs(msg):
     msg.question_s = " & ".join(str(q) for q in msg.question)
     msg.qtype = question.rdtype
     msg.qclass = question.rdclass
-    msg.is_multi_question = len(question) > 1
+    msg.is_multi_question = len(msg.question) > 1
 
     # 操作类型是否为标准查询
     msg.is_query_op = (msg.opcode() == OPCODE_QUERY)
@@ -142,7 +142,7 @@ class NameServer(object):
     @cached_property
     def port(self):
         return self._pr_address.port if self._pr_address.port else (
-            80 if self.is_doh else 53
+            443 if self.is_doh else 53
         )
 
     @cached_property
@@ -578,10 +578,10 @@ class DNSResolver(object):
             qmsg = patch_qmsg_attrs(qmsg)
             qmsg.qsocket_family = socket.AF_INET
             qmsg.qsocket_type = socket.SOCK_DGRAM
-            self.query(qmsg, bypass_cache=True)
+            new_amsg = self.query(qmsg, bypass_cache=True)
 
             if config.ENABLE_DNS_CACHE and qmsg.is_query_op:
-                self.set_cache(qmsg, amsg)
+                self.set_cache(qmsg, new_amsg)
 
             count += 1
 
@@ -744,8 +744,8 @@ class LocalHostsPlugin(object):
             parmas = {
                 SVCBParamKey.ALPN: dns_svcb.ALPNParam([b'h2', b'h3'])
             }
-            if ip_addr == 6:
-                parmas[SVCBParamKey.IPV6HINT] = dns_svcb.IPv4HintParam([host])
+            if ip_addr.version == 6:
+                parmas[SVCBParamKey.IPV6HINT] = dns_svcb.IPv6HintParam([host])
             else:
                 parmas[SVCBParamKey.IPV4HINT] = dns_svcb.IPv4HintParam([host])
             rd = dns.rdtypes.IN.HTTPS.HTTPS(
@@ -812,7 +812,8 @@ class ForeignResolverPlugin(object):
                         if not line or line.startswith("#"):
                             continue
                         patterns.add(line)
-            patterns.add(pattern)
+            else:
+                patterns.add(pattern)
         return patterns
 
     @cached_property
