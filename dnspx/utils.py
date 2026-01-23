@@ -145,3 +145,113 @@ def check_internet_socket(host="8.8.8.8", port=53, socket_type=None, timeout=3):
 
 def is_main_thread():
     return threading.current_thread() == threading.main_thread()
+
+
+class DomainMatcher:
+    """基于 Trie 树的高效域名匹配器
+
+    将域名按 . 分割并反转后构建 Trie 树，实现 O(m) 复杂度的域名匹配，
+    其中 m 为域名的层级数（通常 2-5 层），与 pattern 数量无关。
+
+    支持三种匹配模式：
+    - "google.com"         : 匹配 google.com 及其所有子域名
+    - "full:google.com"    : 仅完全匹配 google.com
+    - "domain:google.com"  : 仅匹配子域名，不匹配 google.com 本身
+    """
+
+    _END = object()  # 标记终点的特殊对象
+
+    def __init__(self, patterns=None):
+        self._trie = {}
+        if patterns:
+            self.add_many(patterns)
+
+    def add(self, pattern):
+        """添加一个域名 pattern"""
+        if not pattern:
+            return
+
+        full_match = False
+        subdomain_only = False
+
+        if pattern.startswith("full:"):
+            pattern = pattern[5:]
+            full_match = True
+        elif pattern.startswith("domain:"):
+            pattern = pattern[7:]
+            subdomain_only = True
+
+        # 按 . 分割并反转
+        parts = pattern.lower().split('.')
+        parts.reverse()
+
+        node = self._trie
+        for part in parts:
+            if part not in node:
+                node[part] = {}
+            node = node[part]
+
+        # 存储匹配模式信息
+        node[self._END] = {
+            'full_match': full_match,
+            'subdomain_only': subdomain_only,
+        }
+
+    def add_many(self, patterns):
+        """批量添加 patterns"""
+        for pattern in patterns:
+            if pattern and not pattern.startswith("ext:"):
+                self.add(pattern)
+
+    def match(self, name):
+        """检查域名是否匹配任意 pattern
+
+        时间复杂度: O(m)，m 为域名的层级数（通常 2-5 层）
+        """
+        if not name:
+            return False
+
+        parts = name.lower().split('.')
+        parts.reverse()
+        total_depth = len(parts)
+
+        node = self._trie
+        for i, part in enumerate(parts):
+            if part not in node:
+                break
+            node = node[part]
+            depth = i + 1
+
+            # 检查当前节点是否是一个有效终点
+            if self._END in node:
+                match_info = node[self._END]
+                is_exact = (depth == total_depth)
+
+                if match_info['full_match']:
+                    # full: 模式要求完全匹配
+                    if is_exact:
+                        return True
+                    # 不是完全匹配，继续检查更深的节点
+                elif match_info['subdomain_only']:
+                    # domain: 模式要求必须是子域名
+                    if not is_exact:
+                        return True
+                    # 是完全匹配，继续检查更深的节点
+                else:
+                    # 普通模式：完全匹配或子域名都可以
+                    return True
+
+        return False
+
+    def __contains__(self, name):
+        return self.match(name)
+
+    def __len__(self):
+        """返回 pattern 数量（遍历统计）"""
+        def count_ends(node):
+            total = 1 if self._END in node else 0
+            for key, child in node.items():
+                if key is not self._END:
+                    total += count_ends(child)
+            return total
+        return count_ends(self._trie)

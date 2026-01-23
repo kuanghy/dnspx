@@ -13,7 +13,6 @@ import logging
 import ipaddress
 from importlib import import_module
 from collections import OrderedDict
-from functools import lru_cache
 from urllib.parse import urlparse
 from urllib.request import (
     Request as HTTPRequest,
@@ -45,6 +44,7 @@ from .utils import (
     cached_property,
     thread_sync,
     check_internet_socket,
+    DomainMatcher,
 )
 from .error import (
     DNSTimeout,
@@ -789,8 +789,9 @@ class ForeignResolverPlugin(object):
         )
 
     @thread_sync()
-    def _fetch_foreign_domains(self):
-        patterns = set()
+    def _fetch_foreign_domain_patterns(self):
+        """获取海外域名 pattern 列表"""
+        patterns = []
         external_config_prefix = "ext:"
         if not config.FOREIGN_DOMAINS:
             foreign_domain_patterns = []
@@ -811,31 +812,23 @@ class ForeignResolverPlugin(object):
                         line = line.strip()
                         if not line or line.startswith("#"):
                             continue
-                        patterns.add(line)
+                        patterns.append(line)
             else:
-                patterns.add(pattern)
+                patterns.append(pattern)
         return patterns
 
     @cached_property
-    def foreign_domains(self):
-        return self._fetch_foreign_domains()
+    def foreign_domain_matcher(self):
+        """基于 Trie 树的海外域名匹配器"""
+        patterns = self._fetch_foreign_domain_patterns()
+        matcher = DomainMatcher(patterns)
+        log.debug("Foreign domain matcher initialized with %d patterns",
+                  len(matcher))
+        return matcher
 
-    @lru_cache(200)
     def check_foreign_domain(self, name):
-        full_match_prefix = "full:"
-        domain_match_prefix = "domain:"
-        for pattern in self.foreign_domains:
-            if pattern.startswith(full_match_prefix):
-                pattern = pattern.replace(full_match_prefix, "")
-                if name == pattern:  # 完全匹配
-                    return True
-            elif pattern.startswith(domain_match_prefix):
-                pattern = pattern.replace(domain_match_prefix, "")
-                if name.endswith(f'.{pattern}'):  # 仅匹配子域名
-                    return True
-            elif pattern == name or name.endswith(f".{pattern}"):
-                return True
-        return False
+        """检查域名是否为海外域名"""
+        return self.foreign_domain_matcher.match(name)
 
     def __call__(self, qmsg):
         name = qmsg.qname_s
@@ -867,8 +860,8 @@ class SplitResolverPlugin(object):
         for domain_group, nameserver_group in config.SPLIT_RESOLVE_MAP.items():
             domain_group = domain_group.upper()
             nameserver_group = nameserver_group.upper()
-            domain_group_list = getattr(config, domain_group)
-            nameserver_group_list = getattr(config, nameserver_group)
+            domain_group_list = getattr(config, domain_group, None)
+            nameserver_group_list = getattr(config, nameserver_group, None)
             if domain_group_list and nameserver_group_list:
                 mapping[domain_group] = nameserver_group
         return mapping
@@ -887,23 +880,28 @@ class SplitResolverPlugin(object):
     def grouped_nameservers(self):
         return self._fetch_grouped_nameservers()
 
-    @lru_cache(200)
+    @thread_sync()
+    def _build_domain_matchers(self):
+        """为每个域名组构建 Trie 匹配器"""
+        matchers = {}
+        for domain_group in self.split_resolve_map.keys():
+            domain_patterns = getattr(config, domain_group.upper(), [])
+            matcher = DomainMatcher(domain_patterns)
+            matchers[domain_group] = matcher
+            log.debug("Domain matcher for %s initialized with %d patterns",
+                      domain_group, len(matcher))
+        return matchers
+
+    @cached_property
+    def domain_matchers(self):
+        return self._build_domain_matchers()
+
     def match_domain(self, name, domain_group_name):
-        full_match_prefix = "full:"
-        domain_match_prefix = "domain:"
-        domain_patterns = getattr(config, domain_group_name.upper())
-        for pattern in domain_patterns:
-            if pattern.startswith(full_match_prefix):
-                pattern = pattern.replace(full_match_prefix, "")
-                if name == pattern:  # 完全匹配
-                    return True
-            elif pattern.startswith(domain_match_prefix):
-                pattern = pattern.replace(domain_match_prefix, "")
-                if name.endswith(f'.{pattern}'):  # 仅匹配子域名
-                    return True
-            elif pattern == name or name.endswith(f".{pattern}"):
-                return True
-        return False
+        """检查域名是否匹配指定的域名组"""
+        matcher = self.domain_matchers.get(domain_group_name)
+        if not matcher:
+            return False
+        return matcher.match(name)
 
     def __call__(self, qmsg):
         name = qmsg.qname_s
