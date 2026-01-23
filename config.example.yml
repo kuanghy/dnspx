@@ -41,9 +41,9 @@ nameservers:
 
 # 上游 DNS 服务器组（主要用于实现分流查询），以 nameserver_group 开头
 nameserver_group_foreign:  # 海外 DNS 服务器组
-    - ["https://1.1.1.1/dns-query", "foreign", "Google DoH IP"]
-    - ["1.1.1.1", "foreign"]  # Google
-    - ["8.8.8.8", "foreign"]  # CloudFlare
+    - ["https://1.1.1.1/dns-query", "foreign", "CloudFlare DoH IP"]
+    - ["1.1.1.1", "foreign"]  # CloudFlare
+    - ["8.8.8.8", "foreign"]  # Google
 
 nameserver_group_tencent:
     - 119.29.29.29
