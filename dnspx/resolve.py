@@ -607,7 +607,7 @@ class DNSResolver(object):
         data = self.get_cache(qmsg)
         if data:
             data.id = qmsg.id
-            log.debug(f"Query [{qmsg.question_s}] cache is valid, use it")
+            log.debug(f"[{qmsg.id} {qmsg.question_s}] query cache hit")
             return data
         else:
             return default
