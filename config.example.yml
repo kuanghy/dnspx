@@ -283,6 +283,14 @@ domain_group_foreign:
     - v2ray.ws
     - binance.com
     - okx.com
+    - gitlab.com
+    - golang.org
+    - amazonaws.com
+    - openai.com
+    - chatgpt.com
+    - anthropic.com
+    - claude.ai
+
 
 # 开启海外域名用海外 DNS 解析功能（该功能已经废弃，建议使用分流查询）
 enable_foreign_resolve: false
