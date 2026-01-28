@@ -162,8 +162,11 @@ domain_group_360:
     - 360.net
     - 360.cn
     - 360.com
+    - 360.com.cn
     - qihoo.com
+    - qifu.com
     - so.com
+    - fangcloud.com
     - ludashi.com
 
 domain_group_apple:
