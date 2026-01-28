@@ -149,6 +149,14 @@ domain_group_baidu:
     - baiduads.com
     - bdydns.cn
     - dudns.com
+    - hao123.com
+    - aipage.com
+    - apollo.auto
+    - baidu-cdn.cn
+    - baidu-cdn.com
+    - baidu-cdn.net
+    - baidu.cn
+    - baidu.com.cn
 
 domain_group_360:
     - 360.net
