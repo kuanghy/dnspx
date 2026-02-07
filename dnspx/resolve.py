@@ -558,7 +558,7 @@ class DNSResolver(object):
         return self.query_cache.evict()
 
     def refresh_cache(self):
-        if not self.query_cache:
+        if not config.ENABLE_DNS_CACHE or not self.query_cache:
             return
         # 仅刷新最新使用的 2/3 缓存，但至少为 10 个
         size = max(round(self.query_cache.size() * (2 / 3)), 10)
@@ -585,7 +585,7 @@ class DNSResolver(object):
                             qmsg.question_s, ex)
                 continue
 
-            if config.ENABLE_DNS_CACHE and qmsg.is_query_op:
+            if qmsg.is_query_op:
                 self.set_cache(qmsg, new_amsg)
 
             count += 1
@@ -699,12 +699,13 @@ class LocalHostsPlugin(object):
                 line = line.strip()
                 if not line or line.startswith("#"):
                     continue
-                host_name = line.split()
-                if len(host_name) > 1:
-                    host, name = host_name[:2]
+                parts = line.split()
+                if len(parts) >= 2:
+                    ip, names = parts[0], parts[1:]
+                    for name in names:
+                        hosts[name] = ip
                 else:
-                    host, name = self._ipv4_local, host_name[0]
-                hosts[name] = host
+                    hosts[parts[0]] = self._ipv4_local
         if hosts:
             log.info(f"Load hosts file '{path}', size {len(hosts)}")
         return hosts
@@ -746,19 +747,19 @@ class LocalHostsPlugin(object):
                 host,
             )
         elif qmsg.qtype == QTYPE_HTTPS:
-            parmas = {
+            params = {
                 SVCBParamKey.ALPN: dns_svcb.ALPNParam([b'h2', b'h3'])
             }
             if ip_addr.version == 6:
-                parmas[SVCBParamKey.IPV6HINT] = dns_svcb.IPv6HintParam([host])
+                params[SVCBParamKey.IPV6HINT] = dns_svcb.IPv6HintParam([host])
             else:
-                parmas[SVCBParamKey.IPV4HINT] = dns_svcb.IPv4HintParam([host])
+                params[SVCBParamKey.IPV4HINT] = dns_svcb.IPv4HintParam([host])
             rd = dns.rdtypes.IN.HTTPS.HTTPS(
                 dns.rdataclass.IN,
                 QTYPE_HTTPS,
                 priority=1,
                 target='.',
-                params=parmas,
+                params=params,
             )
         else:
             log.warning(f"Local query '{name}' host is IPv{ip_addr.version}, "
@@ -812,7 +813,7 @@ class ForeignResolverPlugin(object):
         for pattern in foreign_domain_patterns:
             if pattern.startswith(external_config_prefix):
                 config_path = pattern.replace(external_config_prefix, "")
-                with open(config_path) as fp:
+                with open(config_path, encoding="utf-8") as fp:
                     for line in fp:
                         line = line.strip()
                         if not line or line.startswith("#"):

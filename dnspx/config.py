@@ -207,13 +207,14 @@ APP_BUNDLE_PATH = None
 
 
 # 配置文件目录
-_CONFIG_DIRS = [
+_DEFAULT_CONFIG_DIRS = [
     '/etc/dnspx/',
     '/usr/local/etc/dnspx',
     _os.path.join(USER_HOME, '.local', 'etc', 'dnspx'),
     _os.path.join(USER_HOME, '.config', 'dnspx'),
-    _os.path.join(_os.getcwd(), 'config')
+    _os.path.join(_os.getcwd(), 'config'),
 ]
+_CONFIG_DIRS = list(_DEFAULT_CONFIG_DIRS)
 
 # 被加载的配置文件
 _LOADED_CONFIG_PATHS = []
@@ -285,7 +286,7 @@ def _parse_config_file(path):
 
 
 def load_config(path=None, reset=False):
-    global _HAS_BEEN_LOADED, _LOADED_CONFIG_PATHS
+    global _HAS_BEEN_LOADED, _LOADED_CONFIG_PATHS, _CONFIG_DIRS
     reset = bool(reset or path)
     if _HAS_BEEN_LOADED and not reset:
         return _sys.modules[__name__]
@@ -313,6 +314,7 @@ def load_config(path=None, reset=False):
             if not ROTATE_LOG_FILE:
                 ROTATE_LOG_FILE = _os.path.join(APP_LOG_PATH, "dnspx.log")
 
+    _CONFIG_DIRS = list(_DEFAULT_CONFIG_DIRS)
     if path and _os.path.isdir(path):
         _CONFIG_DIRS.append(path)
     env_path = _os.getenv("DNSPX_CONFIG_PATH")

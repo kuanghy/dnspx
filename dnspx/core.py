@@ -7,8 +7,8 @@ import os
 import time
 import socket
 import signal
+import struct
 import logging
-import binascii
 import platform
 import threading
 import socketserver
@@ -124,8 +124,9 @@ class TCPHandler(DNSHandler, socketserver.BaseRequestHandler):
         if len(length_data) < 2:
             log.warning("TCP request length data incomplete, received %d bytes",
                         len(length_data))
+            return
 
-        msg_length = int.from_bytes(length_data, byteorder='big') if length_data else 0
+        msg_length = int.from_bytes(length_data, byteorder='big')
         data = b''
         while len(data) < msg_length:
             chunk = self.request.recv(msg_length - len(data))
@@ -139,10 +140,9 @@ class TCPHandler(DNSHandler, socketserver.BaseRequestHandler):
 
         response = self.parse(data)
 
-        if response:
-            # 计算响应的长度
-            length = binascii.unhexlify("%04x" % len(response))
-            self.request.sendall(length + response)
+        # 始终发送长度前缀：有响应时发长度+正文，无响应时发长度 0，避免客户端一直等待
+        length = struct.pack('!H', len(response))
+        self.request.sendall(length + response)
 
 
 class BaseSocketServer(socketserver.ThreadingMixIn):

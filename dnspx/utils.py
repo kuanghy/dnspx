@@ -147,7 +147,7 @@ def is_main_thread():
     return threading.current_thread() == threading.main_thread()
 
 
-class DomainMatcher:
+class DomainMatcher(object):
     """基于 Trie 树的高效域名匹配器
 
     将域名按 . 分割并反转后构建 Trie 树，实现 O(m) 复杂度的域名匹配，

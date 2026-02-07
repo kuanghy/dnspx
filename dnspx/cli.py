@@ -30,7 +30,7 @@ def parse_arguments(args):
     add_arg(server_group, "--enable-tcp", action="store_true",
             help="Enable TCP server, default UDP only")
     add_arg(server_group, "--enable-ipv6", action="store_true",
-            help="Enable IPv6 protocel")
+            help="Enable IPv6 protocol")
     add_arg(server_group, "--hosts-path",
             help="Hosts configuration file paths, "
                  "overwrite LOCAL_HOSTS_PATH configuration")
