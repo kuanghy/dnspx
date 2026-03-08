@@ -22,7 +22,7 @@ from . import config
 from .version import __version__
 from .utils import cached_property, suppress, thread_sync, is_tty
 from .utils import is_main_thread
-from .resolve import DNSResolver, patch_qmsg_attrs, RCODE_NOERROR
+from .resolve import DNSResolver, QueryContext, RCODE_NOERROR
 from .error import DNSTimeout, DNSUnreachableError
 
 
@@ -49,16 +49,10 @@ class DNSHandler(object):
         response = b''
         client = self.client_address[0]
         try:
-            qmsg = dns.message.from_wire(message)
-
-            # NOTE:
-            # 内置解析器只对有单个 question 的请求做特殊处理，如本地自定义域解析，缓存等
-            # 对于有多个 question 的请求，内置解析器直接做转发处理
-            patch_qmsg_attrs(qmsg)
-
-            # XXX: 后续对这两个属性的依赖处理有问题，实际不需要，后续考虑去除
-            qmsg.qsocket_family = self.server.address_family  # IPv4 or IPv6
-            qmsg.qsocket_type = self.server.socket_type       # UDP or TCP
+            msg = dns.message.from_wire(message)
+            qmsg = QueryContext(msg,
+                                socket_family=self.server.address_family,
+                                socket_type=self.server.socket_type)
             self.qmsg = qmsg
         except Exception as ex:
             log.error(f"Invalid DNS request from {client}, msg: {ex}")

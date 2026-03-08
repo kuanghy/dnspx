@@ -65,34 +65,46 @@ QTYPE_PTR = dns.rdatatype.PTR
 log = logging.getLogger(__name__)
 
 
-def patch_qmsg_attrs(msg):
-    """为查询消息对象添加一些属性，方便后续处理
+class QueryContext(DNSMessage):
+    """DNS 查询上下文，包装原始 DNSMessage 并携带解析过程需要的元数据
 
     这里仅处理最后一个 question，对于多个 question 的消息无意义，因为
     内置解析器只对有单个 question 的请求做特殊处理，如本地自定义域解析，缓存等，
     对于有多个 question 的请求，内置解析器直接做转发处理
     """
-    question = msg.question[-1]
-    msg.question_len = len(question)
-    msg.qname = question.name
-    msg.qname_s = question.name.to_text().strip('.')
-    msg.question_s = " & ".join(str(q) for q in msg.question)
-    msg.qtype = question.rdtype
-    msg.qclass = question.rdclass
-    msg.is_multi_question = len(msg.question) > 1
 
-    # 操作类型是否为标准查询
-    msg.is_query_op = (msg.opcode() == OPCODE_QUERY)
+    def __init__(self, msg, socket_family=socket.AF_INET,
+                 socket_type=socket.SOCK_DGRAM):
+        self.msg = msg  # 原始 DNSMessage 对象
 
-    # 查询类型是否为 PTR
-    msg.is_qtype_ptr = msg.qtype == QTYPE_PTR
+        # 传输层元数据
+        self.qsocket_family = socket_family  # IPv4 or IPv6
+        self.qsocket_type = socket_type      # UDP or TCP
 
-    # DNS服务发现（DNS-Based Service Discovery, DNS-SD）
-    msg.is_dns_sd = (
-        '._dns-sd._udp.' in msg.qname_s or '._dns-sd._tcp.' in msg.qname_s
-    )
+        # 从 question section 提取的查询信息
+        question = msg.question[-1]
+        self.question_len = len(question)
+        self.qname = question.name
+        self.qname_s = question.name.to_text().strip('.')
+        self.question_s = " & ".join(str(q) for q in msg.question)
+        self.qtype = question.rdtype
+        self.qclass = question.rdclass
+        self.is_multi_question = len(msg.question) > 1
 
-    return msg
+        # 操作类型是否为标准查询
+        self.is_query_op = (msg.opcode() == OPCODE_QUERY)
+
+        # 查询类型是否为 PTR
+        self.is_qtype_ptr = self.qtype == QTYPE_PTR
+
+        # DNS 服务发现（DNS-Based Service Discovery, DNS-SD）
+        self.is_dns_sd = (
+            '._dns-sd._udp.' in self.qname_s
+            or '._dns-sd._tcp.' in self.qname_s
+        )
+
+    def __getattr__(self, name):
+        return getattr(self.msg, name)
 
 
 class NameServer(object):
@@ -575,9 +587,9 @@ class DNSResolver(object):
                 rdclass=qclass,
                 flags=dns.flags.RD
             )
-            qmsg = patch_qmsg_attrs(qmsg)
-            qmsg.qsocket_family = socket.AF_INET
-            qmsg.qsocket_type = socket.SOCK_DGRAM
+            qmsg = QueryContext(qmsg,
+                                socket_family=socket.AF_INET,
+                                socket_type=socket.SOCK_DGRAM)
             try:
                 new_amsg = self.query(qmsg, bypass_cache=True)
             except Exception as ex:
