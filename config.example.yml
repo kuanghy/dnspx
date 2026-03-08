@@ -35,7 +35,7 @@ nameservers:
     - "https://doh.360.cn/dns-query"
     - "https://dns.adguard-dns.com/dns-query"
     - ["https://doh.opendns.com/dns-query", "foreign", "OpenDNS DoH"]
-    - ["https://dns.google/dns-query", "foreign", Google DoH]
+    - ["https://dns.google/dns-query", "foreign", "Google DoH"]
     - ["https://cloudflare-dns.com/dns-query", "foreign", "CloudFlare DNS DoH"]
     - ["https://101.101.101.101/dns-query", "foreign", "台湾 Quad 101 DoH"]
 
@@ -303,7 +303,6 @@ domain_group_foreign:
     - claude.ai
     - cursor.sh
     - cursor.com
-
 
 # 开启海外域名用海外 DNS 解析功能（该功能已经废弃，建议使用分流查询）
 enable_foreign_resolve: false

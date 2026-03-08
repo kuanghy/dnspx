@@ -103,11 +103,11 @@ class DNSHandler(object):
 class UDPHandler(DNSHandler, socketserver.BaseRequestHandler):
 
     def handle(self):
-        (data, socket) = self.request
+        (data, sock) = self.request
         response = self.parse(data)
 
         if response:
-            socket.sendto(response, self.client_address)
+            sock.sendto(response, self.client_address)
 
 
 class TCPHandler(DNSHandler, socketserver.BaseRequestHandler):
