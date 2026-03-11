@@ -271,6 +271,9 @@ domain_group_foreign:
     - facebook.com
     - twitter.com
     - x.com
+    - twimg.com
+    - x.ai
+    - grok.com
     - instagram.com
     - netflix.com
     - pinterest.com
