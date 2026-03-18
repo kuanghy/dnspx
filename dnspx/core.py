@@ -179,6 +179,99 @@ class ThreadedTCPServer(BaseSocketServer, socketserver.TCPServer):
     allow_reuse_address = True
 
 
+class ControlServer(socketserver.TCPServer):
+    """控制端口 TCP 服务器"""
+
+    allow_reuse_address = True
+    daemon_threads = True
+
+
+class ControlHandler(socketserver.StreamRequestHandler):
+    """控制端口请求处理器"""
+
+    @property
+    def dns_proxy(self):
+        return self.server.dns_proxy
+
+    def handle(self):
+        try:
+            line = self.rfile.readline().decode("utf-8").strip()
+        except Exception:
+            return
+        if not line:
+            return
+        parts = line.split(None, 1)
+        cmd = parts[0]
+        args = parts[1] if len(parts) > 1 else ""
+        try:
+            response = self.dispatch(cmd, args)
+        except Exception as ex:
+            response = f"Error: {ex}"
+        self.wfile.write(response.encode("utf-8") + b"\n")
+
+    def dispatch(self, cmd, args):
+        """分发控制命令"""
+        handlers = {
+            "status": self._ctl_status,
+            "cache-stats": self._ctl_cache_stats,
+            "cache-clear": self._ctl_cache_clear,
+            "reload": self._ctl_reload,
+        }
+        handler = handlers.get(cmd)
+        if not handler:
+            return f"Unknown command: {cmd}"
+        return handler(args)
+
+    def _ctl_status(self, args):
+        proxy = self.dns_proxy
+        uptime = time.time() - proxy._start_time if proxy._start_time else 0
+        hours, remainder = divmod(int(uptime), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        days, hours = divmod(hours, 24)
+        if days > 0:
+            uptime_s = f"{days}d {hours}h {minutes}m {seconds}s"
+        else:
+            uptime_s = f"{hours}h {minutes}m {seconds}s"
+        lines = [
+            f"Version: {__version__}",
+            f"Python: {platform.python_version()}",
+            f"Uptime: {uptime_s}",
+            f"Listen: {proxy.server_address[0]}:{proxy.server_address[1]}",
+            f"TCP: {'enabled' if proxy.enable_tcp else 'disabled'}",
+        ]
+        loaded_paths = config.get_loaded_config_paths()
+        if loaded_paths:
+            lines.append("Config files:")
+            for path in loaded_paths:
+                lines.append(f"  - {path}")
+        return "\n".join(lines)
+
+    def _ctl_cache_stats(self, args):
+        cache = self.dns_proxy.dns_resolver.query_cache
+        lines = [
+            f"Enabled: {config.ENABLE_DNS_CACHE}",
+            f"Size: {cache.size()} / {config.DNS_CACHE_SIZE}",
+            f"TTL: {config.DNS_CACHE_TTL}s",
+            f"Auto refresh: {config.ENABLE_CACHE_REFRESH}",
+        ]
+        return "\n".join(lines)
+
+    def _ctl_cache_clear(self, args):
+        resolver = self.dns_proxy.dns_resolver
+        count = resolver.query_cache.size()
+        resolver.clear_cache()
+        return f"Cache cleared, {count} entries removed."
+
+    def _ctl_reload(self, args):
+        config.load_config(reset=True)
+        resolver = self.dns_proxy.dns_resolver
+        for attr in ['nameservers', 'inland_nameservers',
+                     'foreign_nameservers', 'plugins', '_socks_proxies']:
+            resolver.__dict__.pop(attr, None)
+        log.info("Configuration reloaded via control port")
+        return "Configuration reloaded."
+
+
 class DNSProxyServer(object):
     """DNS 代理服务器"""
 
@@ -192,11 +285,14 @@ class DNSProxyServer(object):
 
         self._udp_server = None
         self._tcp_server = None
+        self._control_server = None
 
         self._udp_server_thread = None
         self._tcp_server_thread = None
+        self._control_server_thread = None
 
         self._keep_running = True
+        self._start_time = None
 
     @property
     def socket_family(self):
@@ -266,6 +362,8 @@ class DNSProxyServer(object):
             self._udp_server.shutdown()
         if self._tcp_server:
             self._tcp_server.shutdown()
+        if self._control_server:
+            self._control_server.shutdown()
         self._keep_running = False
 
     def register_signal_handler(self):
@@ -321,10 +419,27 @@ class DNSProxyServer(object):
             )
             self._tcp_server_thread.daemon = True
             self._tcp_server_thread.start()
+        if config.ENABLE_CONTROL_SERVER:
+            from .utils import parse_ip_port
+            ctl_ip, ctl_port = parse_ip_port(config.CONTROL_SERVER_LISTEN)
+            ctl_port = ctl_port or 8051
+            self._control_server = ControlServer(
+                (ctl_ip, ctl_port), ControlHandler
+            )
+            self._control_server.dns_proxy = self
+            self._control_server_thread = threading.Thread(
+                target=self._control_server.serve_forever,
+                name="ControlServerThread",
+            )
+            self._control_server_thread.daemon = True
+            self._control_server_thread.start()
+            log.info("Control server started on '%s:%s'", ctl_ip, ctl_port)
+
         log.info("DNSPX server started on address '%s:%s'",
                  *self.server_address)
 
         self._keep_running = True
+        self._start_time = time.time()
 
         last_evict_cache_time = time.time()
         try:

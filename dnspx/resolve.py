@@ -4,6 +4,7 @@
 # Author: Huoty <sudohuoty@163.com>
 
 import os
+import ssl
 import time
 import glob
 import random
@@ -140,8 +141,11 @@ class NameServer(object):
 
     @cached_property
     def is_doh(self):
-        # Check DNS over HTTP
         return self._pr_address.scheme in ("http", "https")
+
+    @cached_property
+    def is_dot(self):
+        return self._pr_address.scheme == "tls"
 
     @cached_property
     def is_foreign(self):
@@ -154,7 +158,7 @@ class NameServer(object):
     @cached_property
     def port(self):
         return self._pr_address.port if self._pr_address.port else (
-            443 if self.is_doh else 53
+            443 if self.is_doh else (853 if self.is_dot else 53)
         )
 
     @cached_property
@@ -322,6 +326,43 @@ class _TCPQuery(_UDPQuery):
         return self._convert_message(self.adata[2:])
 
 
+class _TLSQuery(_TCPQuery):
+
+    def make_socket(self):
+        super().make_socket()
+        ctx = ssl.create_default_context()
+        self.socket = ctx.wrap_socket(
+            self.socket, server_hostname=self.nameserver.host
+        )
+        return self.socket
+
+    @staticmethod
+    def _recv_exactly(sock, n):
+        """从 TLS socket 精确读取 n 个字节"""
+        data = b''
+        while len(data) < n:
+            chunk = sock.recv(n - len(data))
+            if not chunk:
+                break
+            data += chunk
+        return data
+
+    def receive_msg(self, expiration=None):
+        sock = self.get_sock()
+        # TLS 可能将数据分成多个记录，不能依赖单次 recv 拿到完整响应，
+        # 需要先读 2 字节长度前缀，再按长度精确读取
+        length_data = self._recv_exactly(sock, 2)
+        if len(length_data) < 2:
+            received_time = time.time()
+            self.adata = length_data
+            return length_data, received_time
+        msg_length = struct.unpack('!H', length_data)[0]
+        wire = self._recv_exactly(sock, msg_length)
+        received_time = time.time()
+        self.adata = length_data + wire
+        return wire, received_time
+
+
 class _HTTPQuery(_BaseQuery):
 
     @property
@@ -404,6 +445,13 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
                 proxyserver=_proxyserver,
                 timeout=_timeout
             )
+        elif nameserver.is_dot:
+            query = _TLSQuery(
+                qmsg, nameserver,
+                proxyserver=_proxyserver,
+                socket_family=qmsg.qsocket_family,
+                timeout=_timeout
+            )
         else:
             Query = (_UDPQuery if qsocket_type == socket.SOCK_DGRAM
                      else _TCPQuery)
@@ -458,12 +506,15 @@ class DNSResolver(object):
 
     def check_nameservers(self, socket_type=socket.SOCK_DGRAM):
         for server in self.nameservers:
-            if server.is_doh:
-                continue
+            # DoH/DoT 底层都是 TCP，强制用 TCP 检测
+            if server.is_doh or server.is_dot:
+                _socket_type = socket.SOCK_STREAM
+            else:
+                _socket_type = socket_type
             ret = check_internet_socket(
                 server.host,
                 server.port,
-                socket_type,
+                _socket_type,
                 self.timeout,
             )
             if ret:

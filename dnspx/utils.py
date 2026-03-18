@@ -129,14 +129,29 @@ def is_tty():
 
 
 def check_internet_socket(host="8.8.8.8", port=53, socket_type=None, timeout=3):
-    socket = import_module("socket")
+    _socket = import_module("socket")
     if not socket_type:
-        socket_type = socket.SOCK_STREAM
+        socket_type = _socket.SOCK_STREAM
     try:
-        sock = socket.socket(socket.AF_INET, socket_type)
+        sock = _socket.socket(_socket.AF_INET, socket_type)
         sock.settimeout(timeout)
-        sock.connect((host, port))
-    except socket.error:
+        if socket_type == _socket.SOCK_DGRAM:
+            # UDP connect 不会真正探测连通性，需要发送 DNS 查询等待响应
+            # 构造一个最小的 DNS 查询报文（查询根域 NS 记录）
+            dns_query = (
+                b'\x00\x01'  # Transaction ID
+                b'\x01\x00'  # Flags: RD=1
+                b'\x00\x01'  # QDCOUNT: 1
+                b'\x00\x00\x00\x00\x00\x00'  # ANCOUNT, NSCOUNT, ARCOUNT
+                b'\x00'      # Root domain
+                b'\x00\x02'  # Type: NS
+                b'\x00\x01'  # Class: IN
+            )
+            sock.sendto(dns_query, (host, port))
+            sock.recvfrom(512)
+        else:
+            sock.connect((host, port))
+    except _socket.error:
         return False
     else:
         sock.close()

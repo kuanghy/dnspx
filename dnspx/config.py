@@ -54,7 +54,7 @@ NAMESERVERS = DEFAULT_NAMESERVERS = [
     "114.114.114.110",  # 114DNS 拦截色情网站
 
     # DNS over HTTP (DOH)服务器
-    # 不能只单独配置 DOH，需要配合至少一个 UDP 或 TCP 的上游服务器使用
+    # 如果使用的是域名，则不能只单独配置 DOH，需要配合至少一个 UDP 或 TCP 的上游服务器使用
     "https://dns.alidns.com/dns-query",
     "https://doh.pub/dns-query",
     "https://doh.360.cn/dns-query",
@@ -140,6 +140,10 @@ SPLIT_RESOLVE_MAP = {  # 分流查询映射表
 
 # 服务监听地址
 SERVER_LISTEN = "127.0.0.1:53"
+
+# 远程控制服务
+ENABLE_CONTROL_SERVER = True
+CONTROL_SERVER_LISTEN = "127.0.0.1:8051"
 
 # 网络代理服务器
 PROXY_SERVERS = None
