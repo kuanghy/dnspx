@@ -264,6 +264,7 @@ domain_group_telegram:
 domain_group_foreign:
     - github.com
     - github.io
+    - githubassets.com
     - githubusercontent.com
     - stackoverflow.com
     - yahoo.com
@@ -291,6 +292,8 @@ domain_group_foreign:
     - gitbook.com
     - wordpress.com
     - opendns.com
+    - cloudflare.com
+    - cloudflare.net
     - cloudflare-dns.com
     - v2ray.com
     - v2fly.org
@@ -306,6 +309,7 @@ domain_group_foreign:
     - claude.ai
     - cursor.sh
     - cursor.com
+    - perplexity.ai
 
 # 开启海外域名用海外 DNS 解析功能（该功能已经废弃，建议使用分流查询）
 enable_foreign_resolve: false
