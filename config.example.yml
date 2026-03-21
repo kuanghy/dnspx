@@ -27,17 +27,10 @@ nameservers:
     - "114.114.114.114"
     - "119.29.29.29"
     - "223.5.5.5"
-    - ["1.1.1.1", "foreign", "CloudFlare DNS，号称全球最快的 DNS 服务"]
-    - ["8.8.8.8", "foreign", "Google Public DNS"]
-    - ["208.67.222.222", "foreign", "OpenDNS"]
     - "https://dns.alidns.com/dns-query"
     - "https://doh.pub/dns-query"
-    - "https://doh.360.cn/dns-query"
-    - "https://dns.adguard-dns.com/dns-query"
-    - ["https://doh.opendns.com/dns-query", "foreign", "OpenDNS DoH"]
-    - ["https://dns.google/dns-query", "foreign", "Google DoH"]
     - ["https://cloudflare-dns.com/dns-query", "foreign", "CloudFlare DNS DoH"]
-    - ["https://101.101.101.101/dns-query", "foreign", "台湾 Quad 101 DoH"]
+    - ["https://dns.google/dns-query", "foreign", "Google DoH"]
 
 # 上游 DNS 服务器组（主要用于实现分流查询），以 nameserver_group 开头
 nameserver_group_foreign:  # 海外 DNS 服务器组

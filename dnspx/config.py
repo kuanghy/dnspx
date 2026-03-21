@@ -33,7 +33,7 @@ NAMESERVERS = DEFAULT_NAMESERVERS = [
     ("223.5.5.5", "inland", "AliDNS 阿里公共 DNS"),
     ("114.114.114.114", "inland", "国内电信运营商自用的 DNS 服务"),
     ("180.76.76.76", "inland", "百度 BaiduDNS"),
-    ("1.2.4.8", "inland", "CNNIC sDNS"),
+    ("1.2.4.8", "inland", "CNNIC（中国互联网信息中心）公共 DNS 服务"),
     ("117.50.11.11", "inland", "OneDNS 拦截版"),
     ("117.50.10.10", "inland", "OneDNS 纯净版"),
 
@@ -52,6 +52,10 @@ NAMESERVERS = DEFAULT_NAMESERVERS = [
     "114.114.115.115",  # 114DNS 备用地址
     "114.114.114.119",  # 114DNS 拦截钓鱼病毒木马网站
     "114.114.114.110",  # 114DNS 拦截色情网站
+
+    # DNS over TLS (DOT)服务器
+    "tls://223.5.5.5",  # 阿里 DNS
+    "tls://119.29.29.29",  # 腾讯 DNSPod
 
     # DNS over HTTP (DOH)服务器
     # 如果使用的是域名，则不能只单独配置 DOH，需要配合至少一个 UDP 或 TCP 的上游服务器使用
