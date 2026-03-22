@@ -260,28 +260,33 @@ class ControlHandler(socketserver.StreamRequestHandler):
         resolver = self.dns_proxy.dns_resolver
         count = resolver.query_cache.size()
         resolver.clear_cache()
+        log.info("Cache cleared via control port, %s entries removed", count)
         return f"Cache cleared, {count} entries removed."
 
     def _ctl_reload(self, args):
-        config.load_config(reset=True)
+        config.load_config(self.dns_proxy.config_path, reset=True)
         resolver = self.dns_proxy.dns_resolver
-        for attr in ['nameservers', 'inland_nameservers',
-                     'foreign_nameservers', 'plugins', '_socks_proxies']:
+        for attr in ['nameservers', 'inland_nameservers', 'foreign_nameservers',
+                     'plugins', '_socks_proxies', 'query_cache']:
             resolver.__dict__.pop(attr, None)
-        log.info("Configuration reloaded via control port")
-        return "Configuration reloaded."
+        self.dns_proxy._apply_extra_hosts(resolver)
+        log.info("Resolver configuration reloaded via control port")
+        return "Resolver configuration reloaded."
 
 
 class DNSProxyServer(object):
     """DNS 代理服务器"""
 
     def __init__(self, server_address, nameservers=None, hosts_path=None,
-                 enable_tcp=False, enable_ipv6=False):
+                 enable_tcp=False, enable_ipv6=False,
+                 control_server_address=None, config_path=None):
         self.server_address = server_address
         self.nameservers = nameservers
         self.hosts_path = hosts_path
         self.enable_tcp = enable_tcp
         self.enable_ipv6 = enable_ipv6
+        self.control_server_address = control_server_address
+        self.config_path = config_path
 
         self._udp_server = None
         self._tcp_server = None
@@ -305,19 +310,20 @@ class DNSProxyServer(object):
         log.info("Query timeout: %s, foreign query timeout: %s",
                  timeout, config.FOREIGN_QUERY_TIMEOUT)
         resolver = DNSResolver(self.nameservers, timeout=timeout)
-        plugins = resolver.plugins
-        hosts_plugin = plugins.get("local_hosts")
-        if hosts_plugin:
-            if self.hosts_path:
-                config_paths = hosts_plugin.fetch_config_files(self.hosts_path)
-                hosts = {}
-                for config_path in config_paths:
-                    hosts.update(hosts_plugin.parse_hosts_file(config_path))
-                hosts_plugin.hosts.update(hosts)
-            log.debug("All local hosts size %s", len(hosts_plugin.hosts))
+        self._apply_extra_hosts(resolver)
         log.debug("All nameservers: %s",
                   [str(item) for item in resolver.nameservers])
         return resolver
+
+    def _apply_extra_hosts(self, resolver):
+        """将命令行 --hosts-path 指定的 hosts 文件应用到 local_hosts 插件"""
+        hosts_plugin = resolver.plugins.get("local_hosts")
+        if not hosts_plugin:
+            return
+        if self.hosts_path:
+            for path in hosts_plugin.fetch_config_files(self.hosts_path):
+                hosts_plugin.hosts.update(hosts_plugin.parse_hosts_file(path))
+        log.debug("All local hosts size %s", len(hosts_plugin.hosts))
 
     def set_priority(self):
         if not hasattr(os, "getpriority") or not hasattr(os, "setpriority"):
@@ -421,7 +427,10 @@ class DNSProxyServer(object):
             self._tcp_server_thread.start()
         if config.ENABLE_CONTROL_SERVER:
             from .utils import parse_ip_port
-            ctl_ip, ctl_port = parse_ip_port(config.CONTROL_SERVER_LISTEN)
+            ctl_addr = (
+                self.control_server_address or config.CONTROL_SERVER_LISTEN
+            )
+            ctl_ip, ctl_port = parse_ip_port(ctl_addr)
             ctl_port = ctl_port or 8051
             self._control_server = ControlServer(
                 (ctl_ip, ctl_port), ControlHandler

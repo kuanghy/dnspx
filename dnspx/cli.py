@@ -84,7 +84,7 @@ def parse_arguments(args):
             help="Send control command to running server "
                  "(status, cache-stats, cache-clear, reload)")
     add_arg(ctl_group, "--ctl-address",
-            help="Control server address (default from config)")
+            help="Control listen / --ctl target (default from config)")
 
     query_group = parser.add_argument_group(title="query arguments")
     add_arg(query_group, "--query", metavar="DOMAIN",
@@ -165,6 +165,8 @@ def main(args=None):
         hosts_path=args.hosts_path,
         enable_tcp=args.enable_tcp,
         enable_ipv6=args.enable_ipv6,
+        control_server_address=args.ctl_address,
+        config_path=args.config,
     )
     server.run()
     logging.shutdown()
