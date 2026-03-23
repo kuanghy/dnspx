@@ -295,13 +295,23 @@ domain_group_foreign:
     - okx.com
     - gitlab.com
     - golang.org
+    - bitbucket.org
+    - python.org
+    - pythonhosted.org
+    - pypi.org
+    - crates.io
+    - npmjs.org
+    - npmjs.com
     - amazonaws.com
     - openai.com
     - chatgpt.com
     - anthropic.com
+    - claude.com
     - claude.ai
     - cursor.sh
     - cursor.com
+    - cursorapi.com
+    - cursor-cdn.com
     - perplexity.ai
 
 # 开启海外域名用海外 DNS 解析功能（该功能已经废弃，建议使用分流查询）
