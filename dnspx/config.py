@@ -97,6 +97,12 @@ DNS_CACHE_SIZE = 512
 DNS_CACHE_TTL = 60 * 30  # 默认为 30 分钟
 ENABLE_CACHE_REFRESH = True  # 是否自动刷新缓存
 
+# 缓存持久化
+ENABLE_CACHE_PERSIST = False
+CACHE_PERSIST_FILE = _os.path.join(
+    __import__("tempfile").gettempdir(), "dnspx-cache.dat"
+)
+
 # 开启本地 hosts 文件支持
 ENABLE_LOCAL_HOSTS = True
 LOCAL_HOSTS_PATH = None  # 本地 hosts 文件路径，可以为目录或者单个文件

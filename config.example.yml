@@ -18,6 +18,9 @@ foreign_query_timeout: 5
 enable_dns_cache: true
 dns_cache_size: 512
 
+# 开启缓存持久化
+enable_cache_persist: false
+
 # 开启本地 hosts 文件支持
 enable_local_hosts: true
 local_hosts_path: null

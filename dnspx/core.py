@@ -14,15 +14,15 @@ import threading
 import socketserver
 from importlib import import_module
 
+import dns.rcode
 import dns.message
 from dns.message import Message as DNSMessage
-
 
 from . import config
 from .version import __version__
 from .utils import cached_property, suppress, thread_sync, is_tty
 from .utils import is_main_thread
-from .resolve import DNSResolver, QueryContext, RCODE_NOERROR
+from .resolve import DNSResolver, QueryContext
 from .error import DNSTimeout, DNSUnreachableError
 
 
@@ -44,8 +44,10 @@ class DNSHandler(object):
     def setup(self):
         self.qmsg = None
         self.amsg = None
+        self._start_time = None
 
     def parse(self, message):
+        self._start_time = time.time()
         response = b''
         client = self.client_address[0]
         try:
@@ -58,7 +60,6 @@ class DNSHandler(object):
             log.error(f"Invalid DNS request from {client}, msg: {ex}")
             return response
 
-        log.info(f"[{qmsg.id} {qmsg.question_s}] from {client}")
         resolver = self.server.dns_resolver
         try:
             if self.is_network_anomaly():
@@ -67,7 +68,6 @@ class DNSHandler(object):
                 amsg = resolver.query_from_cache(qmsg, default=b'')
             else:
                 amsg = resolver.query(qmsg)
-            self.amsg = amsg
         except (DNSTimeout, DNSUnreachableError) as ex:
             if not self.server.check_nameservers(self.server.socket_type):
                 with thread_sync():
@@ -79,25 +79,32 @@ class DNSHandler(object):
             amsg = b''
             log.exception(f"[{qmsg.id} {qmsg.question_s}] query failed")
 
+        self.amsg = amsg
         response = amsg.to_wire() if isinstance(amsg, DNSMessage) else amsg
         return response
 
     def finish(self):
         qmsg = self.qmsg
         amsg = self.amsg
-        if isinstance(amsg, DNSMessage):
-            rcode = amsg.rcode()
-            is_no_error = rcode == RCODE_NOERROR
-            if not is_no_error and not qmsg.is_qtype_ptr and not qmsg.is_dns_sd:
-                log.debug("[%s %s] RCODE: %s", qmsg.id, qmsg.question_s, rcode)
 
+        cache_hit = False
+        if isinstance(amsg, DNSMessage) and qmsg is not None:
             resolver = self.server.dns_resolver
-            if (
-                config.ENABLE_DNS_CACHE
-                and qmsg.is_query_op
-                and not resolver.has_cache(qmsg)
-            ):
+            is_cache_enabled = config.ENABLE_DNS_CACHE and qmsg.is_query_op
+            cached = resolver.has_cache(qmsg) if is_cache_enabled else False
+            cache_hit = cached and not qmsg.is_multi_question
+            if is_cache_enabled and not cached and not qmsg.is_multi_question:
                 resolver.set_cache(qmsg, amsg)
+
+        if self._start_time is not None and qmsg is not None:
+            elapsed = (time.time() - self._start_time) * 1000
+            rcode_s = (dns.rcode.to_text(amsg.rcode())
+                       if isinstance(amsg, DNSMessage) else "-")
+            cache_s = "cache:hit" if cache_hit else "cache:miss"
+            log.info(
+                f"[QUERY {self.client_address[0]}] [{qmsg.id} {qmsg.question_s}]"
+                f" [{rcode_s} {elapsed:.3f}ms {cache_s}]"
+            )
 
 
 class UDPHandler(DNSHandler, socketserver.BaseRequestHandler):
@@ -449,6 +456,7 @@ class DNSProxyServer(object):
 
         self._keep_running = True
         self._start_time = time.time()
+        self.dns_resolver.load_cache()
 
         last_evict_cache_time = time.time()
         try:
@@ -459,7 +467,7 @@ class DNSProxyServer(object):
 
                 time.sleep(3)
 
-                # 定时刷新缓存，并清理过期的缓存
+                # 定时刷新缓存，并清理过期的缓存，同时持久化缓存
                 if time.time() - last_evict_cache_time >= 600:
                     with suppress(Exception, logger=log, loglevel="warning"):
                         if config.ENABLE_CACHE_REFRESH:
@@ -468,8 +476,13 @@ class DNSProxyServer(object):
                         remain_count = self.dns_resolver.query_cache.size()
                         log.debug("evict cache done, %s evicted, %s remained",
                                   evicted_count, remain_count)
+                        self.dns_resolver.save_cache()
                         __import__("gc").collect()
                         last_evict_cache_time = time.time()
         except (SystemExit, Exception) as ex:
             log.warning(ex)
+
+        with suppress(Exception, logger=log, loglevel="warning"):
+            self.dns_resolver.save_cache()
+
         log.info("DNSPX server is shutting down")

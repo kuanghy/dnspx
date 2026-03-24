@@ -7,6 +7,7 @@ import os
 import ssl
 import time
 import glob
+import pickle
 import random
 import socket
 import struct
@@ -467,10 +468,10 @@ def proxy_dns_query(qmsg, nameservers, proxyserver=None, timeout=3):
             _log = log.exception
             if isinstance(ex, (OSError, DNSTimeout, BadDNSResponse)):
                 _log = log.warning
-            _log(f"[{qmsg.id} {qmsg.question_s}] proxy to {nameserver} failed: {ex}")
+            _log(f"[PROXY {nameserver}] [{qmsg.id} {qmsg.question_s}] failed: {ex}")
         else:
-            log.info(f"[{qmsg.id} {qmsg.question_s}] proxy to {nameserver} "
-                     f"[{(response_time * 1000):.2f}ms]")
+            log.info(f"[PROXY {nameserver}] [{qmsg.id} {qmsg.question_s}]"
+                     f" [{(response_time * 1000):.2f}ms]")
             break
     else:
         raise DNSUnreachableError("no servers could be reached")
@@ -655,6 +656,55 @@ class DNSResolver(object):
 
         log.debug("%s cache records were refreshed", count)
 
+    def save_cache(self):
+        if not config.ENABLE_CACHE_PERSIST or not config.CACHE_PERSIST_FILE:
+            return
+        try:
+            size = max(round(self.query_cache.size() * (2 / 3)), 10)
+            keys = list(self.query_cache.keys())[-size:]
+            data = {}
+            for key in keys:
+                amsg = self.query_cache.get(key)
+                if not amsg or not isinstance(amsg, DNSMessage):
+                    continue
+                try:
+                    data[key] = amsg.to_wire()
+                except Exception:
+                    continue
+            cache_file = config.CACHE_PERSIST_FILE
+            cache_dir = os.path.dirname(cache_file)
+            if cache_dir:
+                os.makedirs(cache_dir, exist_ok=True)
+            with open(cache_file, 'wb') as fp:
+                pickle.dump(data, fp)
+            log.debug("Cache persisted, %s entries saved to '%s'",
+                      len(data), cache_file)
+        except Exception as ex:
+            log.warning("Failed to persist cache: %s", ex)
+
+    def load_cache(self):
+        if not config.ENABLE_CACHE_PERSIST or not config.CACHE_PERSIST_FILE:
+            return
+        cache_file = config.CACHE_PERSIST_FILE
+        if not os.path.exists(cache_file):
+            return
+        try:
+            with open(cache_file, 'rb') as fp:
+                data = pickle.load(fp)
+            count = 0
+            for key, wire_bytes in data.items():
+                try:
+                    amsg = dns.message.from_wire(wire_bytes)
+                    ttl = round(random.uniform(10, 20), 2)
+                    self.query_cache.set(key, amsg, ttl=ttl)
+                    count += 1
+                except Exception:
+                    continue
+            log.info("Cache restored, %s entries loaded from '%s'",
+                     count, cache_file)
+        except Exception as ex:
+            log.warning("Failed to load cache from '%s': %s", cache_file, ex)
+
     @cached_property
     def _socks_proxies(self):
         proxies = set(config.PROXY_SERVERS or [])
@@ -670,7 +720,6 @@ class DNSResolver(object):
         data = self.get_cache(qmsg)
         if data:
             data.id = qmsg.id
-            log.debug(f"[{qmsg.id} {qmsg.question_s}] query cache hit")
             return data
         else:
             return default
