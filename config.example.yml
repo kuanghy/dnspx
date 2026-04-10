@@ -153,6 +153,8 @@ domain_group_baidu:
     - baidu-cdn.net
     - baidu.cn
     - baidu.com.cn
+    - bdstatic.com
+    - bcebos.com
 
 domain_group_360:
     - 360.net
